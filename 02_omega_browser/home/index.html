@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,">
+<title>OmegaBrowser v0.6.4 :: Sovereign Home</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:#080c15;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:26px 20px}
+.wrap{width:100%;max-width:960px}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;background:#111c30;border:1px solid #1e3a5f;color:#38bdf8;font-size:11px;font-weight:700;letter-spacing:.08em;margin-bottom:8px}
+h1{font-size:27px;font-weight:700;color:#f8fafc;margin-bottom:4px}
+.sub{color:#94a3b8;font-size:12.5px;margin-bottom:14px}
+.wsbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.wsbtn{padding:5px 13px;border-radius:7px;border:1px solid #1e293b;background:#0f172a;color:#94a3b8;font-size:12px;font-weight:600;text-decoration:none}
+.wsbtn.on{background:#0c4a6e;border-color:#38bdf8;color:#f8fafc}
+.srow{display:flex;gap:8px;margin-bottom:16px}
+#q{flex:1;background:#0f172a;border:1px solid #26354d;color:#f8fafc;border-radius:8px;padding:10px 14px;font-size:13.5px;outline:none}
+#q:focus{border-color:#38bdf8}
+.gobtn{background:#0284c7;color:#fff;border:none;border-radius:8px;padding:0 18px;font-weight:700;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:9px;margin-bottom:16px}
+.card{background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 13px;text-decoration:none;color:#e2e8f0}
+.card:hover{border-color:#38bdf8}
+.ct{font-size:13px;font-weight:700;color:#f8fafc;margin-bottom:2px}
+.cd{font-size:11px;color:#64748b}
+.lbl{display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:5px}
+textarea{width:100%;height:135px;background:#0b111e;border:1px solid #1e293b;border-radius:8px;color:#cbd5e1;padding:9px 12px;font-family:Consolas,monospace;font-size:12px;resize:vertical;outline:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="badge" id="wstag">ACT-OMEGA LAB :: V0.6.6 TRI-SILICON PRO</div>
+  <h1>OmegaBrowser <span style="color:#38bdf8;font-size:17px">v0.6.4</span></h1>
+  <div class="sub">Ctrl+J Vault Download Studio (HTTP 206 Pause/Resume) &bull; Ctrl+Shift+D Batch Sniffer &bull; 1-Click Send to OmegaAV &amp; Push to Pixel 8/10 &bull; OLED Companion (:9778)</div>
+  <div class="wsbar" id="wsbar"></div>
+  <form class="srow" onsubmit="goSearch(event)">
+    <input id="q" placeholder="Search or try !mit 6.006, !arxiv E8, !gh sovereign, omega://companion..." autocomplete="off">
+    <button class="gobtn" type="submit">Go</button>
+  </form>
+  <div class="grid" id="tiles"></div>
+  <div class="lbl"><span id="sclbl">Workspace Scratchpad</span><span>Ctrl+J Download Studio &bull; Ctrl+Shift+D Sniffer &bull; Ctrl+Shift+B Braid &bull; Ctrl+Shift+R Code &bull; Ctrl+K Palette</span></div>
+  <textarea id="pad" placeholder="Persistent workspace lab scratchpad (crash-safe localStorage + disk backup)..."></textarea>
+</div>
+<script>
+var params=new URLSearchParams(location.search); var ws=params.get('ws')||'Research';
+var presets={
+  'Research':[['arXiv cs.AI','Latest AI Preprints','https://arxiv.org/list/cs.AI/recent'],['arXiv PDF Test','Zero-DL PDF Stream','https://arxiv.org/pdf/1706.03762.pdf'],['Google Scholar','Academic Citations','https://scholar.google.com/'],['OLED Companion','omega://companion','http://127.0.0.1:9778/companion'],['Performance HUD','omega://performance','https://omega.home/performance.html']],
+  'Training':[['MIT OpenCourseWare','Courses, Math & Code','https://ocw.mit.edu/'],['HuggingFace Datasets','Open Corpus Hub','https://huggingface.co/datasets'],['arXiv cs.LG','Machine Learning','https://arxiv.org/list/cs.LG/recent'],['OLED Companion','omega://companion','http://127.0.0.1:9778/companion'],['Performance HUD','omega://performance','https://omega.home/performance.html']],
+  'Dev':[['ACT-Omega Net','Sovereign Surface','https://act-omega-net.dev/'],['OmegaMirror :19777','Dual-Pixel Bridge','http://127.0.0.1:19777/'],['OmegaAV :19779','E8/Leech Shader Stream','http://127.0.0.1:19779/'],['OmegaForge :19780','Toolchain & Verifier','http://127.0.0.1:19780/api/status'],['OmegaShell :19781','Cockpit & Tuner API','http://127.0.0.1:19781/api/status'],['OmegaSynth :19782','MPE Fretless Pad','http://127.0.0.1:19782/mpe'],['OmegaSheaf :19784','Cohomology Truth-Canvas','http://127.0.0.1:19784/sheaf'],['OmegaPenrose :19785','5D/8D Quasicrystal Pad','http://127.0.0.1:19785/pad'],['OmegaSteg :19786','5-Math OmegaSec & Vault','http://127.0.0.1:19786/vault'],['OmegaSec Status','SH4Z-SEC1 Security Bus','http://127.0.0.1:19786/api/sec/status'],['Performance HUD','Live RAM/CPU/Corpus','https://omega.home/performance.html']]
+};
+document.getElementById('wstag').textContent='ACT-OMEGA LAB :: V0.6.6 :: '+ws.toUpperCase()+' WORKSPACE';
+document.getElementById('sclbl').textContent=ws+' Workspace Scratchpad (Crash-Safe Auto-Save)';
+var wb=document.getElementById('wsbar');
+['Research','Training','Dev'].forEach(function(n){ var a=document.createElement('a'); a.className='wsbtn'+(n===ws?' on':''); a.textContent=n+' Workspace'; a.href='https://omega.home/index.html?ws='+encodeURIComponent(n); wb.appendChild(a); });
+var grid=document.getElementById('tiles');
+(presets[ws]||presets['Research']).forEach(function(it){ var a=document.createElement('a'); a.className='card'; a.href=it[2]; a.innerHTML='<div class="ct">'+it[0]+'</div><div class="cd">'+it[1]+'</div>'; grid.appendChild(a); });
+var pad=document.getElementById('pad'), q=document.getElementById('q'), pk='omega_v02_pad_'+ws, qk='omega_v02_q_'+ws;
+try{ pad.value=localStorage.getItem(pk)||''; q.value=localStorage.getItem(qk)||''; }catch(e){}
+pad.addEventListener('input',function(){ try{ localStorage.setItem(pk,pad.value); if(window.chrome&&window.chrome.webview) window.chrome.webview.postMessage('SCRATCH_SAVE|'+ws+'|'+pad.value); }catch(e){} });
+q.addEventListener('input',function(){ try{ localStorage.setItem(qk,q.value); }catch(e){} });
+function goSearch(ev){ ev.preventDefault(); var v=q.value.trim(); if(!v) return; try{localStorage.setItem(qk,'');}catch(e){} if(window.chrome&&window.chrome.webview) window.chrome.webview.postMessage('OMNI_GO|'+v); }
+</script>
+</body>
+</html>

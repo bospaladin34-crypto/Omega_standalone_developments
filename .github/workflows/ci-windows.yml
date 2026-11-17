@@ -1,0 +1,24 @@
+name: Omega Unified Labs Windows CI
+
+on:
+  push:
+    branches: [ vesper_production, main ]
+  pull_request:
+    branches: [ vesper_production, main ]
+
+jobs:
+  build-and-audit:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Initialize Portable Hardware Profile
+        shell: powershell
+        run: |
+          .\Init-OmegaHardware.ps1 -NonInteractive
+
+      - name: Compile All Stations (Zero-NuGet csc.exe) & Run Headless Stress Suites + #![no_std] Rust Audit
+        shell: powershell
+        run: |
+          .\Build-OmegaLabs.ps1 -SkipLaunch -RunStressSuites

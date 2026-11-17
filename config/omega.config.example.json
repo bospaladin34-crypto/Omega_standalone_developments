@@ -1,0 +1,13 @@
+{
+  "suite_version": "3.0.0",
+  "host_alias": "AUTO_DETECT_HOSTNAME",
+  "gpu_label": "AUTO_DETECT_DXGI",
+  "gpu_vram_mb": 0,
+  "downloads_dir": "downloads",
+  "corpus_dir": "corpus",
+  "cloud_bridge_dir": "bridge_export",
+  "external_project_dir": "workspace",
+  "local_llm_endpoint": "http://127.0.0.1:11434",
+  "openai_compat_endpoint": "http://127.0.0.1:19791/v1/chat/completions",
+  "adb_discovery": "auto"
+}

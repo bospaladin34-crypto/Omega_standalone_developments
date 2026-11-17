@@ -1,0 +1,51 @@
+# Compiled binaries & build outputs
+*.exe
+*.dll
+*.pdb
+*.obj
+*.o
+*.a
+*.lib
+*.exp
+*.so
+*.spv
+*.ilk
+
+# Local hardware configuration (generated per machine by Init-OmegaHardware.ps1)
+config/omega.config.json
+OMEGA_SUITE_MANIFEST.json
+
+# Rust / Cargo / Edge worker build artifacts
+target/
+**/target/
+11_omega_edge_workers/**/bin/
+11_omega_edge_workers/**/omega_pocket_worker
+11_omega_p10_worker/
+
+# Runtime workspaces, caches, WAL journals, renders, & exports
+downloads/
+corpus/
+bridge_export/
+workspace/
+icons/*.ico
+**/exports/
+**/renders/
+**/patches/*.osteg
+**/patches/*.osheaf
+**/patches/*.openrose
+**/cloud_cas/
+**/workspace_builds/
+**/workspace/
+*.ocapsule
+*.ocas
+*.wal
+*.log
+*.avi
+*.mp4
+*.wav
+
+# OS / IDE metadata
+.vs/
+.vscode/
+Thumbs.db
+Desktop.ini

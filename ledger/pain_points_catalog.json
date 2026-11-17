@@ -1,0 +1,152 @@
+[
+  {
+    "id": "PP-01A",
+    "track": 1,
+    "domain": "Desktop Apps",
+    "complaint": "Electron chat/note/IDE wrappers consume 500MB-1.4GB RAM at idle per window",
+    "edge_case": "Multi-renderer V8 heap fragmentation & orphaned GPU helper processes after tab close",
+    "omega_countermeasure": "Single-process x64 native UI + DirectCompute/GDI+ canvas capped under 70 MB WorkingSet64",
+    "chaos_vector": "V7-SUB70MB-NATIVE-RAM-GATE",
+    "task_url": "https://tasks.google.com/task/YrJuUItqfPl___5I?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-01B",
+    "track": 1,
+    "domain": "Developer Tooling",
+    "complaint": "Silent UTF-8 BOMs, CRLF drift, and Win32 reserved/long paths break builds unpredictably",
+    "edge_case": "PowerShell 5.1 Set-Content injects UTF-8 BOM (EF BB BF) breaking rustc/Vite/JSON lexers",
+    "omega_countermeasure": "Deterministic zero-BOM sanitizer + Win32 reserved-device & path-traversal quarantine",
+    "chaos_vector": "V3-UTF8-BOM-WIN32-PATH-GUARD",
+    "task_url": "https://tasks.google.com/task/YrJuUItqfPl___5I?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-01C",
+    "track": 1,
+    "domain": "Research Browsers",
+    "complaint": "Extracting text/tables from large PDFs requires bloated external viewers or cloud uploads",
+    "edge_case": "Truncated FlateDecode streams and 100MB+ academic PDFs stalling UI threads",
+    "omega_countermeasure": "Zero-download streaming DeflateStream parser + SHA-256 deduplicated local corpus ingest",
+    "chaos_vector": "V6-ZERO-GC-RING-BACKPRESSURE",
+    "task_url": "https://tasks.google.com/task/YrJuUItqfPl___5I?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-02A",
+    "track": 2,
+    "domain": "Local AI & Edge NPU",
+    "complaint": "Phone NPUs/TPUs sit 100% idle next to VRAM-starved laptops due to vendor SDK lock-in",
+    "edge_case": "Unloading vendor NNAPI/Vulkan .so via dlclose triggers background Binder thread segfaults",
+    "omega_countermeasure": "Immortal RTLD_NODELETE FFI handles + driver_mem_desc DMA + USB/LAN roofline split",
+    "chaos_vector": "V2-HOT-UNPLUG-SILICON-REROUTE",
+    "task_url": "https://tasks.google.com/task/5Rh6WkCUYfKs3RKy?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-02B",
+    "track": 2,
+    "domain": "Distributed Inference",
+    "complaint": "Unplugging a cable or a phone OTA reboot mid-generation crashes the entire host AI app",
+    "edge_case": "Half-open TCP loopback sockets & mid-token timeout cascades stalling UI/inference threads",
+    "omega_countermeasure": "Sub-2ms fail-closed socket circuit breaker + automatic local GPU fallback & ADB re-arm",
+    "chaos_vector": "V2-HOT-UNPLUG-SILICON-REROUTE",
+    "task_url": "https://tasks.google.com/task/5Rh6WkCUYfKs3RKy?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-02C",
+    "track": 2,
+    "domain": "AI Agent Reliability",
+    "complaint": "Local LLMs emit truncated JSON tool calls, NaN logits, or bracket bombs that crash hosts",
+    "edge_case": "Streaming JSON cut off mid-escape sequence or recursive nesting depth > 64",
+    "omega_countermeasure": "Bounded depth-32 state-machine JSON scanner + NaN/Inf logit trap before execution",
+    "chaos_vector": "V8-AI-STREAM-JSON-LOGIT-GUARD",
+    "task_url": "https://tasks.google.com/task/5Rh6WkCUYfKs3RKy?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-03A",
+    "track": 3,
+    "domain": "Supply-Chain Security",
+    "complaint": "Installing one utility pulls 400+ npm/PyPI transitive packages exposed to supply-chain worms",
+    "edge_case": "Typosquatted postinstall hooks and unpinned transitive minor upgrades",
+    "omega_countermeasure": "Zero-crate #![no_std] Rust & zero-NuGet C# primitives with embedded math/crypto tables",
+    "chaos_vector": "V5-OFFLINE-CRDT-GOLAY24-MERGE",
+    "task_url": "https://tasks.google.com/task/xIFgohFDDiumWn_o?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-03B",
+    "track": 3,
+    "domain": "Local-First Storage",
+    "complaint": "App crash or power loss mid-save corrupts config/vault JSON files into 0-byte garbage",
+    "edge_case": "OS page-cache partial flush leaving torn half-written header + mismatched payload",
+    "omega_countermeasure": "Dual-slot Seqlock + IEEE CRC-32 write-ahead journal rolling back cleanly to prior commit",
+    "chaos_vector": "V1-TORN-WRITE-ATOMIC-WAL",
+    "task_url": "https://tasks.google.com/task/xIFgohFDDiumWn_o?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-03C",
+    "track": 3,
+    "domain": "Offline Multi-Device Sync",
+    "complaint": "Editing notes/configs offline on two devices creates destructive conflict copies",
+    "edge_case": "Out-of-order noisy packet delivery over LAN or air-gapped acoustic/QR channels",
+    "omega_countermeasure": "Commutative LWW-Element-Set CRDT merge + Extended Golay [24,12,8] 3-bit self-healing ECC",
+    "chaos_vector": "V5-OFFLINE-CRDT-GOLAY24-MERGE",
+    "task_url": "https://tasks.google.com/task/xIFgohFDDiumWn_o?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-04A",
+    "track": 4,
+    "domain": "Audio & Spatial Control",
+    "complaint": "Expressive 3D/MPE controllers cost hundreds of dollars and suffer Bluetooth MIDI jitter",
+    "edge_case": "GC pauses on DSP/UI threads causing audible crackles and >15ms control latency",
+    "omega_countermeasure": "Pre-allocated 64KB zero-GC ring buffer + 4,096B lock-free Seqlock Hopf S^3->S^2 wand bus",
+    "chaos_vector": "V6-ZERO-GC-RING-BACKPRESSURE",
+    "task_url": "https://tasks.google.com/task/Kp2YcFemUYHQTmjD?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-04B",
+    "track": 4,
+    "domain": "Ultrasonic Sensing",
+    "complaint": "Naive chirp/CW ultrasonic gesture trackers hallucinate ghosts from desk/wall reflections",
+    "edge_case": "Autocorrelation sidelobes masking weak hand Doppler shifts at 0.3m-1.5m desk range",
+    "omega_countermeasure": "19.000 kHz Golay complementary pairs (R_A + R_B = 0 for all k != 0) eliminating sidelobes",
+    "chaos_vector": "V5-OFFLINE-CRDT-GOLAY24-MERGE",
+    "task_url": "https://tasks.google.com/task/Kp2YcFemUYHQTmjD?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-04C",
+    "track": 4,
+    "domain": "Cross-App Modulation",
+    "complaint": "Routing live motion/audio modulation across synths, shaders, and engines requires spaghetti",
+    "edge_case": "Slow WebSocket JSON serialization dropping 60-180 Hz control frames under GPU load",
+    "omega_countermeasure": "180,000+ frm/s binary Seqlock MMF + compact UDP OSC/MPE fan-out",
+    "chaos_vector": "V6-ZERO-GC-RING-BACKPRESSURE",
+    "task_url": "https://tasks.google.com/task/Kp2YcFemUYHQTmjD?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-05A",
+    "track": 5,
+    "domain": "Polyglot Systems & FFI",
+    "complaint": "Passing structs across Rust, C++23, and C# crashes silently when a field alignment shifts",
+    "edge_case": "Implicit 4-byte tail padding after u32 before u64/f64 causing silent pointer corruption",
+    "omega_countermeasure": "Pre-flight Cellular Sheaf coboundary verifier (H^1 = 0) checking offset/size/align parity",
+    "chaos_vector": "V4-SHEAF-FFI-ABI-SURGEON",
+    "task_url": "https://tasks.google.com/task/GNQomvEXWCzhpzt8?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-05B",
+    "track": 5,
+    "domain": "Game Modding (Mod City)",
+    "complaint": "Large Skyrim/Fallout load orders softlock quests hours into a save with zero warning",
+    "edge_case": "Two plugins overriding shared quest stages/navmesh edges with incompatible preconditions",
+    "omega_countermeasure": "Static Sheaf graph audit over plugin record overrides flagging H^1 != 0 cycles pre-launch",
+    "chaos_vector": "V4-SHEAF-FFI-ABI-SURGEON",
+    "task_url": "https://tasks.google.com/task/GNQomvEXWCzhpzt8?sa=DLSA_GEMINI"
+  },
+  {
+    "id": "PP-05C",
+    "track": 5,
+    "domain": "Native Plugin Stability",
+    "complaint": "Native DLL script-extender plugins crash on game patch updates without actionable logs",
+    "edge_case": "Signature scan returning 0 or multiple matches on updated .exe text segments",
+    "omega_countermeasure": "Fail-closed pattern uniqueness check + structured crash-ring telemetry dump",
+    "chaos_vector": "V1-TORN-WRITE-ATOMIC-WAL",
+    "task_url": "https://tasks.google.com/task/GNQomvEXWCzhpzt8?sa=DLSA_GEMINI"
+  }
+]
