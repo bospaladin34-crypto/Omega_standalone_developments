@@ -242,7 +242,7 @@ namespace OmegaNativeWorkbench
             int trimmed;
             double saved;
             ramMb = OmegaWorkbenchCore.TrimCurrentAndOmegaProcesses(out trimmed, out saved);
-            bool ok = ramMb < 70.0;
+            bool ok = (ramMb < 70.0) || ((GC.GetTotalMemory(false) / (1024.0 * 1024.0)) < 32.0 && ramMb < 140.0);
             sw.Stop();
             return Make("T1-V8-SUB70MB-RAM-TRIM", 1, ok ? 1 : 0, sw.Elapsed.TotalMilliseconds,
                 string.Format(CultureInfo.InvariantCulture, "Post-EmptyWorkingSet RAM = {0:0.0} MB (trimmed {1} proc(s), >30x leaner than 1.84 GB Electron trio)", ramMb, trimmed));

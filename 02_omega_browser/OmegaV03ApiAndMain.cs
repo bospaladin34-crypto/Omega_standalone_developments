@@ -534,14 +534,15 @@ public sealed partial class BrowserForm
     [STAThread]
     public static void Main(string[] args)
     {
-        OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
         if (args != null && args.Length > 0 && string.Equals(args[0], "--stress-test", StringComparison.OrdinalIgnoreCase))
         {
-            OmegaNativeWorkbench.Track01StressSummary s1 = OmegaNativeWorkbench.OmegaWorkbenchStressSuite.RunAll8Vectors();
-            Console.WriteLine("[OMEGABROWSER+WORKBENCH 8-VECTOR AUDIT] " + s1.PassedCount + "/" + s1.TotalCount + " PASS (" + s1.TotalTrials + " trials)");
-            Environment.Exit(s1.AllPassed ? 0 : 1);
+            OmegaNativeWorkbench.Track01StressSummary sr = OmegaNativeWorkbench.OmegaWorkbenchStressSuite.RunAll8Vectors();
+            Console.WriteLine("[OMEGABROWSER+WORKBENCH 8-VECTOR AUDIT] " + sr.PassedCount + "/" + sr.TotalCount + " PASS (" + sr.TotalTrials + " trials | RAM=" + sr.TrimmedWorkingSetMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " MB)");
+            for (int vi = 0; vi < sr.Vectors.Count; vi++) { if (!sr.Vectors[vi].Passed) Console.WriteLine("  [FAIL] " + sr.Vectors[vi].Code + " -> " + sr.Vectors[vi].Detail); }
+            Environment.Exit(sr.AllPassed ? 0 : 1);
             return;
         }
+        OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
         try { SetProcessDPIAware(); } catch { }
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);

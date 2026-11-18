@@ -52,7 +52,7 @@ namespace OmegaStegStudio
         {
             Track03StressSummary s = OmegaVaultStressSuite.RunAll8Vectors();
             _txtLog.AppendText(string.Format(CultureInfo.InvariantCulture,
-                "=== ZERO-CRATE VAULT 8-VECTOR AUDIT: {0}/{1} PASS ({2} trials in {3:0.1} ms | RAM={4:0.1} MB) ===\r\n",
+                "=== ZERO-CRATE VAULT 8-VECTOR AUDIT: {0}/{1} PASS ({2} trials in {3:0.0} ms | RAM={4:0.0} MB) ===\r\n",
                 s.PassedCount, s.TotalCount, s.TotalTrials, s.TotalMs, s.TrimmedWorkingSetMb));
             for (int i = 0; i < s.Vectors.Count; i++)
             {

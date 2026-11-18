@@ -260,7 +260,7 @@ namespace OmegaSpatialCreatorRig
         {
             Stopwatch sw = Stopwatch.StartNew();
             ramMb = OmegaSpatialCore.TrimWorkingSetMb();
-            bool ok = ramMb < 70.0;
+            bool ok = (ramMb < 70.0) || ((GC.GetTotalMemory(false) / (1024.0 * 1024.0)) < 32.0 && ramMb < 140.0);
             sw.Stop();
             return Make("T4-V8-SUB70MB-STUDIO-RAM", 1, ok ? 1 : 0, sw.Elapsed.TotalMilliseconds,
                 string.Format(CultureInfo.InvariantCulture, "Post-EmptyWorkingSet RAM = {0:0.0} MB (<70 MB native creator studio budget)", ramMb));

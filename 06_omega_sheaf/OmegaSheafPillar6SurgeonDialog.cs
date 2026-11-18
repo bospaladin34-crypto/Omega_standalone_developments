@@ -73,7 +73,7 @@ namespace OmegaSheafStudio
         {
             Track05StressSummary s = OmegaSheafModStressSuite.RunAll8Vectors();
             _txtLog.AppendText(string.Format(CultureInfo.InvariantCulture,
-                "=== PILLAR 6 SHEAF FFI/MOD/AOB SURGEON: {0}/{1} PASS ({2} trials in {3:0.1} ms | RAM={4:0.1} MB) ===\r\n",
+                "=== PILLAR 6 SHEAF FFI/MOD/AOB SURGEON: {0}/{1} PASS ({2} trials in {3:0.0} ms | RAM={4:0.0} MB) ===\r\n",
                 s.PassedCount, s.TotalCount, s.TotalTrials, s.TotalMs, s.TrimmedWorkingSetMb));
             for (int i = 0; i < s.Vectors.Count; i++)
             {

@@ -2003,14 +2003,15 @@ namespace OmegaSheafStudio
         [STAThread]
         public static void Main(string[] args)
         {
-            OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             if (args != null && args.Length > 0 && string.Equals(args[0], "--stress-test", StringComparison.OrdinalIgnoreCase))
             {
-                OmegaSheafModSurgeon.Track05StressSummary s5 = OmegaSheafModSurgeon.OmegaSheafModStressSuite.RunAll8Vectors();
-                Console.WriteLine("[OMEGASHEAF+MODSURGEON 8-VECTOR AUDIT] " + s5.PassedCount + "/" + s5.TotalCount + " PASS (" + s5.TotalTrials + " trials)");
-                Environment.Exit(s5.AllPassed ? 0 : 1);
+                OmegaSheafModSurgeon.Track05StressSummary sr = OmegaSheafModSurgeon.OmegaSheafModStressSuite.RunAll8Vectors();
+                Console.WriteLine("[OMEGASHEAF+MODSURGEON 8-VECTOR AUDIT] " + sr.PassedCount + "/" + sr.TotalCount + " PASS (" + sr.TotalTrials + " trials | RAM=" + sr.TrimmedWorkingSetMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " MB)");
+                for (int vi = 0; vi < sr.Vectors.Count; vi++) { if (!sr.Vectors[vi].Passed) Console.WriteLine("  [FAIL] " + sr.Vectors[vi].Code + " -> " + sr.Vectors[vi].Detail); }
+                Environment.Exit(sr.AllPassed ? 0 : 1);
                 return;
             }
+            OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

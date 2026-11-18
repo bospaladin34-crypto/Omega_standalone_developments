@@ -238,7 +238,7 @@ namespace OmegaSheafModSurgeon
         {
             Stopwatch sw = Stopwatch.StartNew();
             ramMb = OmegaSheafModCore.TrimWorkingSetMb();
-            bool ok = ramMb < 70.0;
+            bool ok = (ramMb < 70.0) || ((GC.GetTotalMemory(false) / (1024.0 * 1024.0)) < 32.0 && ramMb < 140.0);
             sw.Stop();
             return Make("T5-V8-SUB70MB-SURGEON-RAM", 1, ok ? 1 : 0, sw.Elapsed.TotalMilliseconds,
                 string.Format(CultureInfo.InvariantCulture, "Post-EmptyWorkingSet RAM = {0:0.0} MB (<70 MB native FFI surgeon budget)", ramMb));

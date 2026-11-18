@@ -242,11 +242,36 @@ if ($RunStressSuites) {
         $lbl = $st[0]
         $exe = $st[1]
         $wd  = [System.IO.Path]::GetDirectoryName($exe)
-        $p = Start-Process -FilePath $exe -ArgumentList "--stress-test" -WorkingDirectory $wd -Wait -PassThru -WindowStyle Hidden
-        if ($p.ExitCode -eq 0) {
-            Write-Host ("  [AUDIT PASS] {0}" -f $lbl) -ForegroundColor Green
+        $psi = New-Object System.Diagnostics.ProcessStartInfo($exe, "--stress-test")
+        $psi.WorkingDirectory = $wd
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $outTask = $proc.StandardOutput.ReadToEndAsync()
+        $errTask = $proc.StandardError.ReadToEndAsync()
+        if (-not $proc.WaitForExit(60000)) {
+            try { $proc.Kill() } catch { }
+            throw ("Stress suite timed out after 60s on {0}" -f $lbl)
+        }
+        $null = $proc.WaitForExit()
+        $stdOut = ($outTask.GetAwaiter().GetResult() | Out-String).Trim()
+        $firstLine = ""
+        if ($stdOut -ne "") {
+            $firstLine = ($stdOut -split "
+?
+")[0].Trim()
+        }
+        if ($proc.ExitCode -eq 0) {
+            if ($firstLine -ne "") {
+                Write-Host ("  [AUDIT PASS] {0,-26} -> {1}" -f $lbl, $firstLine) -ForegroundColor Green
+            } else {
+                Write-Host ("  [AUDIT PASS] {0,-26} -> Exit 0" -f $lbl) -ForegroundColor Green
+            }
         } else {
-            throw ("Stress suite failed on {0} (ExitCode {1})" -f $lbl, $p.ExitCode)
+            $stdErr = ($errTask.GetAwaiter().GetResult() | Out-String).Trim()
+            throw ("Stress suite failed on {0} (ExitCode {1}): {2} {3}" -f $lbl, $proc.ExitCode, $stdOut, $stdErr)
         }
     }
 }

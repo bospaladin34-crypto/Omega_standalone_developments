@@ -698,14 +698,14 @@ namespace OmegaConductorStudio
             if (!IsMapped || _acc == null) return false;
 
             byte[] payload = new byte[88];
-            for (int attempt = 0; attempt < 16; attempt++)
+            for (int attempt = 0; attempt < 4096; attempt++)
             {
                 retriesUsed = attempt;
                 long s0 = _acc.ReadInt64(8);
                 Thread.MemoryBarrier();
                 if ((s0 & 1L) != 0L || s0 == 0L)
                 {
-                    Thread.SpinWait(16);
+                    if (attempt < 64) Thread.SpinWait(16); else Thread.Yield();
                     continue;
                 }
 

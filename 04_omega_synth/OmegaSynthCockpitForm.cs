@@ -2006,14 +2006,15 @@ namespace OmegaSynthStudio
         [STAThread]
         public static void Main(string[] args)
         {
-            OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             if (args != null && args.Length > 0 && string.Equals(args[0], "--stress-test", StringComparison.OrdinalIgnoreCase))
             {
-                OmegaSpatialCreatorRig.Track04StressSummary s4 = OmegaSpatialCreatorRig.OmegaSpatialStressSuite.RunAll8Vectors();
-                Console.WriteLine("[OMEGASYNTH+SPATIAL 8-VECTOR AUDIT] " + s4.PassedCount + "/" + s4.TotalCount + " PASS (" + s4.TotalTrials + " trials)");
-                Environment.Exit(s4.AllPassed ? 0 : 1);
+                OmegaSpatialCreatorRig.Track04StressSummary sr = OmegaSpatialCreatorRig.OmegaSpatialStressSuite.RunAll8Vectors();
+                Console.WriteLine("[OMEGASYNTH+SPATIAL 8-VECTOR AUDIT] " + sr.PassedCount + "/" + sr.TotalCount + " PASS (" + sr.TotalTrials + " trials | RAM=" + sr.TrimmedWorkingSetMb.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " MB)");
+                for (int vi = 0; vi < sr.Vectors.Count; vi++) { if (!sr.Vectors[vi].Passed) Console.WriteLine("  [FAIL] " + sr.Vectors[vi].Code + " -> " + sr.Vectors[vi].Detail); }
+                Environment.Exit(sr.AllPassed ? 0 : 1);
                 return;
             }
+            OmegaPortableConfig.OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

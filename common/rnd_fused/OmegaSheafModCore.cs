@@ -136,7 +136,10 @@ namespace OmegaSheafModSurgeon
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
-                EmptyWorkingSet(Process.GetCurrentProcess().Handle);
+                Process self = Process.GetCurrentProcess();
+                EmptyWorkingSet(self.Handle);
+                self.Refresh();
+                return self.WorkingSet64 / (1024.0 * 1024.0);
             }
             catch { }
             return Process.GetCurrentProcess().WorkingSet64 / (1024.0 * 1024.0);

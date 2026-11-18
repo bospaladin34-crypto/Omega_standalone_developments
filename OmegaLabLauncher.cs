@@ -2225,6 +2225,7 @@ namespace OmegaStandaloneLab
         [STAThread]
         public static void Main(string[] args)
         {
+            if (args != null && args.Length > 0 && string.Equals((args[0] ?? "").Trim(), "--stress-test", StringComparison.OrdinalIgnoreCase)) { ChaosSuiteSummary cs = OmegaRnDEdgeCaseTortureSuite.RunAll8ChaosVectors(); Console.WriteLine("[OMEGA UNIFIED DECK 8-VEC CHAOS] " + cs.PassedVectors + "/" + cs.TotalVectors + " PASS (" + cs.TotalTrials + " trials | RAM=" + cs.WorkingSetMb.ToString("0.0", CultureInfo.InvariantCulture) + " MB)"); Environment.Exit(cs.AllPassed ? 0 : 1); return; }
             OmegaHardwareProfile hwProf = OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             string r = hwProf.LabRoot;
             OmegaUnifiedDeckHttpServer.EnsureStarted(19800);
@@ -2233,7 +2234,6 @@ namespace OmegaStandaloneLab
                 string a = (args[0] ?? "").Trim().ToLowerInvariant();
                 if (a == "--arm-pixels") { ArmAllPixelsStatic(); return; }
                 if (a == "--sync-bridge") { Console.WriteLine(ExecuteSuiteBridgeSync(r)); return; }
-                if (a == "--stress-test") { ChaosSuiteSummary cs = OmegaRnDEdgeCaseTortureSuite.RunAll8ChaosVectors(); Console.WriteLine("[OMEGA UNIFIED DECK 8-VEC CHAOS] " + cs.PassedVectors + "/" + cs.TotalVectors + " PASS (" + cs.TotalTrials + " trials)"); Environment.Exit(cs.AllPassed ? 0 : 1); return; }
                 if (a == "--sec-stress") { Process p = Process.Start(Path.Combine(r, @"08_omega_steg\OmegaSteg.exe"), "--stress-test"); if (p != null) p.WaitForExit(); return; }
                 if (a == "--p10-bench") { Process p = Process.Start("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -File \"" + Path.Combine(r, @"11_omega_edge_workers\rust_p10_worker\Deploy-And-Run-Pixel10Worker.ps1") + "\" -Action Bench"); if (p != null) p.WaitForExit(); return; }
                 if (a == "--p10-tensor") { Process p = Process.Start("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -File \"" + Path.Combine(r, @"11_omega_edge_workers\rust_p10_worker\Deploy-And-Run-Pixel10Worker.ps1") + "\" -Action TensorOnly"); if (p != null) p.WaitForExit(); return; }

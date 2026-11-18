@@ -313,18 +313,18 @@ namespace OmegaSpatialCreatorRig
         {
             frame = null;
             byte[] payload = new byte[56];
-            for (int spin = 0; spin < 16; spin++)
+            for (int spin = 0; spin < 4096; spin++)
             {
                 uint magic = _acc.ReadUInt32(0);
                 if (magic != BusMagic) return false;
                 ulong g1 = _acc.ReadUInt64(4);
-                if (g1 == 0UL || (g1 & 1UL) != 0UL) continue;
+                if (g1 == 0UL || (g1 & 1UL) != 0UL) { if (spin < 64) Thread.SpinWait(16); else Thread.Yield(); continue; }
                 Thread.MemoryBarrier();
                 _acc.ReadArray(12, payload, 0, 56);
                 uint wantCrc = _acc.ReadUInt32(68);
                 Thread.MemoryBarrier();
                 ulong g2 = _acc.ReadUInt64(4);
-                if (g1 != g2) continue;
+                if (g1 != g2) { if (spin < 64) Thread.SpinWait(16); else Thread.Yield(); continue; }
                 if (OmegaSpatialCore.ComputeCrc32(payload, 0, 56) != wantCrc) continue;
 
                 SpatialBusFrame f = new SpatialBusFrame();
@@ -389,7 +389,10 @@ namespace OmegaSpatialCreatorRig
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
-                EmptyWorkingSet(Process.GetCurrentProcess().Handle);
+                Process self = Process.GetCurrentProcess();
+                EmptyWorkingSet(self.Handle);
+                self.Refresh();
+                return self.WorkingSet64 / (1024.0 * 1024.0);
             }
             catch { }
             return Process.GetCurrentProcess().WorkingSet64 / (1024.0 * 1024.0);

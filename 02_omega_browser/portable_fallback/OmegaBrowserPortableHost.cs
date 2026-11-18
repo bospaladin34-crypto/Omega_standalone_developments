@@ -124,7 +124,7 @@ namespace OmegaBrowserPortable
             if (url.Length == 0) return;
             try { _tridentView.Navigate(url); } catch { }
             HttpProbeResult res = OmegaWorkbenchCore.ExecuteBoundedHttpProbe("GET", url, "", "", 262144, 8000);
-            ulong sim = OmegaWorkbenchCore.ComputeSimHash64(res.BodyPreview ?? "");
+            ulong sim = OmegaWorkbenchCore.ComputeSimHash64(Encoding.UTF8.GetBytes(res.BodyPreview ?? ""));
             _txtOut.AppendText(string.Format(CultureInfo.InvariantCulture,
                 "[HTTP {0}] {1} ({2:0.0} ms, {3} B) | SimHash64=0x{4:X16}\r\n",
                 res.StatusCode, url, res.TotalMs, res.PayloadBytes, sim));
@@ -179,7 +179,7 @@ namespace OmegaBrowserPortable
                     {
                         Track01StressSummary sum = OmegaWorkbenchStressSuite.RunAll8Vectors();
                         Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-                            "[OMEGABROWSER+WORKBENCH 8-VECTOR AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.1} MB",
+                            "[OMEGABROWSER+WORKBENCH 8-VECTOR AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.0} MB",
                             sum.PassedCount, sum.TotalCount, sum.TotalTrials, sum.TrimmedWorkingSetMb));
                         return sum.AllPassed ? 0 : 1;
                     }
