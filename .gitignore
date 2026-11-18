@@ -49,3 +49,7 @@ icons/*.ico
 .vscode/
 Thumbs.db
 Desktop.ini
+
+# Local prebuilt release bundles (uploaded via GitHub Releases, never committed)
+dist/
+*.zip

@@ -1,0 +1,106 @@
+name: Omega Release Windows x64 Prebuilt Bundle
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to publish (e.g. v3.0.3)'
+        required: false
+        default: 'v3.0.3'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    steps:
+      - name: Checkout Tagged Commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build All 14 Stations, Run Stress Audits & Package Prebuilt x64 Zip + SHA256SUMS
+        id: bundle
+        shell: pwsh
+        run: |
+          $Tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
+          if ([string]::IsNullOrWhiteSpace($Tag)) { $Tag = "v3.0.3" }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Package-ReleaseBundle.ps1 -Version $Tag -BaselineCommit "ff09a73"
+          if ($LASTEXITCODE -ne 0) { throw "Package-ReleaseBundle.ps1 failed ($LASTEXITCODE)" }
+          "tag=$Tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Publish GitHub Release & Upload Prebuilt Zip + SHA256SUMS via Official GitHub REST API
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $Tag  = "${{ steps.bundle.outputs.tag }}"
+          $Repo = "${{ github.repository }}"
+          $Dist = Join-Path $PWD "dist"
+          $ZipName = "Omega_Standalone_Labs_${Tag}_win-x64_Prebuilt.zip"
+          $ZipPath = Join-Path $Dist $ZipName
+          $SumsPath = Join-Path $Dist "SHA256SUMS.txt"
+          $NotesPath = Join-Path $Dist "RELEASE_NOTES_${Tag}.md"
+          $NotesBody = [System.IO.File]::ReadAllText($NotesPath, [System.Text.Encoding]::UTF8)
+
+          $Headers = @{
+              "Authorization"        = "Bearer $env:GITHUB_TOKEN"
+              "Accept"               = "application/vnd.github+json"
+              "X-GitHub-Api-Version" = "2022-11-28"
+              "User-Agent"           = "OmegaStandaloneLabs-ReleasePublisher"
+          }
+
+          # Idempotent Create-or-Update Release for $Tag
+          $Release = $null
+          try {
+              $Release = Invoke-RestMethod -Method Get -Uri "https://api.github.com/repos/$Repo/releases/tags/$Tag" -Headers $Headers
+              Write-Host "Found existing GitHub Release id=$($Release.id) for $Tag; updating notes and refreshing assets..." -ForegroundColor Cyan
+              $PatchPayload = @{
+                  name       = "Unified Omega Standalone & R&D Labs $Tag GM"
+                  body       = $NotesBody
+                  draft      = $false
+                  prerelease = $false
+              } | ConvertTo-Json -Depth 5
+              $Release = Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/$Repo/releases/$($Release.id)" -Headers $Headers -Body ([System.Text.Encoding]::UTF8.GetBytes($PatchPayload)) -ContentType "application/json; charset=utf-8"
+          } catch {
+              Write-Host "Creating new GitHub Release for tag $Tag..." -ForegroundColor Cyan
+              $CreatePayload = @{
+                  tag_name               = $Tag
+                  name                   = "Unified Omega Standalone & R&D Labs $Tag GM"
+                  body                   = $NotesBody
+                  draft                  = $false
+                  prerelease             = $false
+                  generate_release_notes = $false
+              } | ConvertTo-Json -Depth 5
+              $Release = Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$Repo/releases" -Headers $Headers -Body ([System.Text.Encoding]::UTF8.GetBytes($CreatePayload)) -ContentType "application/json; charset=utf-8"
+          }
+
+          $BaseUploadUrl = ($Release.upload_url -split '\{')[0]
+          $AssetsToUpload = @(
+              @{ Name = $ZipName;         Path = $ZipPath;  Mime = "application/zip" },
+              @{ Name = "SHA256SUMS.txt"; Path = $SumsPath; Mime = "text/plain; charset=utf-8" }
+          )
+
+          foreach ($Asset in $AssetsToUpload) {
+              foreach ($Existing in @($Release.assets)) {
+                  if ($null -ne $Existing -and $Existing.name -eq $Asset.Name) {
+                      Write-Host "Removing previous asset $($Asset.Name) (id=$($Existing.id))..." -ForegroundColor Yellow
+                      $null = Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/$Repo/releases/assets/$($Existing.id)" -Headers $Headers
+                  }
+              }
+              $UploadUri = "{0}?name={1}" -f $BaseUploadUrl, [Uri]::EscapeDataString($Asset.Name)
+              Write-Host "Uploading release asset $($Asset.Name) -> $UploadUri ..." -ForegroundColor Cyan
+              $Uploaded = Invoke-RestMethod -Method Post -Uri $UploadUri -Headers $Headers -InFile $Asset.Path -ContentType $Asset.Mime
+              Write-Host "  [UPLOADED] $($Uploaded.browser_download_url)" -ForegroundColor Green
+          }
+
+          Write-Host "=== GITHUB RELEASE PUBLISHED: $($Release.html_url) ===" -ForegroundColor Green
