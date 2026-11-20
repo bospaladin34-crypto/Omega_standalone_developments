@@ -17,15 +17,15 @@ if (-not (Test-Path $Csc)) {
     throw "Required .NET Framework 4.x compiler not found at: $Csc"
 }
 
-Write-Host "========================================================================" -ForegroundColor Cyan
-Write-Host " OMEGA UNIFIED LABS v3.0.0 :: ZERO-NUGET 14-BINARY COMPILER & VERIFIER" -ForegroundColor Cyan
-Write-Host "========================================================================" -ForegroundColor Cyan
+Write-Host "=========================================================================" -ForegroundColor Cyan
+Write-Host " OMEGA UNIFIED LABS v3.0.4 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
+Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # Stop any running station binaries before recompiling in place
 $StationNames = @(
     "OmegaLabLauncher","OmegaMirror","OmegaBrowser","OmegaAV","OmegaSynth",
     "OmegaSonar","OmegaSheaf","OmegaPenrose","OmegaSteg","OmegaForge",
-    "OmegaShell","OmegaConductor","OmegaTensor"
+    "OmegaShell","OmegaConductor","OmegaTensor","OmegaBraidRE"
 )
 foreach ($sn in $StationNames) {
     Get-Process -Name $sn -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -101,7 +101,7 @@ function Find-WebView2Dlls {
 
 $FailCount = 0
 
-# 00. Build OmegaLabLauncher first so --make-icons generates procedural .ico assets on fresh clones!
+# 00. Build OmegaLabLauncher first so --make-icons generates all 14 procedural .ico assets on fresh clones!
 $LauncherExe = Join-Path $RepoRoot "OmegaLabLauncher.exe"
 $LauncherSrc = @(
     $CommonCfg,
@@ -122,7 +122,7 @@ $MirrorDir = Join-Path $RepoRoot "01_omega_mirror"
 $MirrorSrc = @($CommonCfg, (Join-Path $MirrorDir "OmegaMirrorDualNet.cs"), (Join-Path $MirrorDir "OmegaMirrorHostForm.cs"))
 if (-not (Invoke-StationBuild "01. OmegaMirror (:19777)" (Join-Path $MirrorDir "OmegaMirror.exe") (Join-Path $IconsDir "omega_mirror.ico") @() $MirrorSrc)) { $FailCount++ }
 
-# 02. OmegaBrowser (:9778) -- Auto-selects full WebView2 build or Zero-DLL Native Workbench fallback!
+# 02. OmegaBrowser (:9778)
 $BrDir = Join-Path $RepoRoot "02_omega_browser"
 $BrExe = Join-Path $BrDir "OmegaBrowser.exe"
 if (Find-WebView2Dlls -BrowserDir $BrDir) {
@@ -195,25 +195,38 @@ $TnDir = Join-Path $RepoRoot "13_omega_tensor"
 $TnSrc = @($CommonCfg, (Join-Path $RndDir "OmegaPocketCore.cs"), (Join-Path $RndDir "OmegaPocketStressSuite.cs")) + @(Get-ChildItem -Path $TnDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "13. OmegaTensor (:19791 + OpenAI v1)" (Join-Path $TnDir "OmegaTensor.exe") (Join-Path $IconsDir "omega_tensor.ico") @() $TnSrc)) { $FailCount++ }
 
-# Optional Rust #![no_std] 10-Test Audit Crate + Host Edge Companion
+# 14. OmegaBraidRE (:19794 Zero-Crate PE .pdata / IAT / EAT / RIP / ECMA-335 #~ CIL Lifter & E8 Differ)
+$ReDir = Join-Path $RepoRoot "14_omega_braid_re"
+$ReSrc = @($CommonCfg) + @(Get-ChildItem -Path $ReDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
+if (-not (Invoke-StationBuild "14. OmegaBraidRE (:19794 Lifter+Differ)" (Join-Path $ReDir "OmegaBraidRE.exe") (Join-Path $IconsDir "omega_braid_re.ico") @() $ReSrc)) { $FailCount++ }
+
+# Optional Rust #![no_std] Zero-Crate Invariant Suites (00_core_rust_audit + 14_omega_braid_re\rust_braid_re_core)
 if (-not $SkipRust) {
     $CargoCmd = Get-Command "cargo.exe" -ErrorAction SilentlyContinue
     if ($CargoCmd) {
-        Write-Host ">>> Verifying 00_core_rust_audit (#![no_std] Zero-Crate 10-Test Suite)..." -ForegroundColor Cyan
-        Push-Location (Join-Path $RepoRoot "00_core_rust_audit")
-        $OldInc = $env:CARGO_INCREMENTAL
-        $env:CARGO_INCREMENTAL = "0"
-        try {
-            & $CargoCmd.Source test --quiet | Out-Host
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "  [PASS] 00_core_rust_audit -> 10/10 #![no_std] tests verified" -ForegroundColor Green
-            } else {
-                Write-Host "  [FAIL] 00_core_rust_audit cargo test failed" -ForegroundColor Red
-                $FailCount++
+        $RustSuites = @(
+            @("00_core_rust_audit", (Join-Path $RepoRoot "00_core_rust_audit"), "10/10"),
+            @("omega_braid_re_core", (Join-Path $ReDir "rust_braid_re_core"), "5/5")
+        )
+        foreach ($rs in $RustSuites) {
+            if (Test-Path $rs[1]) {
+                Write-Host (">>> Verifying {0} (#![no_std] Zero-Crate {1} Suite)..." -f $rs[0], $rs[2]) -ForegroundColor Cyan
+                Push-Location $rs[1]
+                $OldInc = $env:CARGO_INCREMENTAL
+                $env:CARGO_INCREMENTAL = "0"
+                try {
+                    & $CargoCmd.Source test --quiet | Out-Host
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host ("  [PASS] {0} -> {1} #![no_std] tests verified" -f $rs[0], $rs[2]) -ForegroundColor Green
+                    } else {
+                        Write-Host ("  [FAIL] {0} cargo test failed" -f $rs[0]) -ForegroundColor Red
+                        $FailCount++
+                    }
+                } finally {
+                    $env:CARGO_INCREMENTAL = $OldInc
+                    Pop-Location
+                }
             }
-        } finally {
-            $env:CARGO_INCREMENTAL = $OldInc
-            Pop-Location
         }
     }
 }
@@ -222,9 +235,9 @@ if ($FailCount -gt 0) {
     throw "Build failed on $FailCount station(s)."
 }
 
-# Optional Headless Stress-Suite Verification
+# Optional Headless Stress-Suite Verification (All 12 Audited Binaries!)
 if ($RunStressSuites) {
-    Write-Host ">>> Running Headless Stress Suites Across Fused Stations..." -ForegroundColor Magenta
+    Write-Host ">>> Running Headless Stress Suites Across All 12 Audited Stations..." -ForegroundColor Magenta
     $StressTargets = @(
         @("OmegaLabLauncher (:19800 Chaos)", $LauncherExe),
         @("01. OmegaMirror", (Join-Path $MirrorDir "OmegaMirror.exe")),
@@ -236,7 +249,8 @@ if ($RunStressSuites) {
         @("09. OmegaForge+Firewall", (Join-Path $FgDir "OmegaForge.exe")),
         @("10. OmegaShell+Sandbox", (Join-Path $ShDir "OmegaShell.exe")),
         @("12. OmegaConductor", (Join-Path $CdDir "OmegaConductor.exe")),
-        @("13. OmegaTensor+Pocket", (Join-Path $TnDir "OmegaTensor.exe"))
+        @("13. OmegaTensor+Pocket", (Join-Path $TnDir "OmegaTensor.exe")),
+        @("14. OmegaBraidRE", (Join-Path $ReDir "OmegaBraidRE.exe"))
     )
     foreach ($st in $StressTargets) {
         $lbl = $st[0]
@@ -259,9 +273,7 @@ if ($RunStressSuites) {
         $stdOut = ($outTask.GetAwaiter().GetResult() | Out-String).Trim()
         $firstLine = ""
         if ($stdOut -ne "") {
-            $firstLine = ($stdOut -split "
-?
-")[0].Trim()
+            $firstLine = ($stdOut -split "\r?\n")[0].Trim()
         }
         if ($proc.ExitCode -eq 0) {
             if ($firstLine -ne "") {
@@ -280,12 +292,12 @@ if ($CreateDesktopShortcut) {
     try {
         $DesktopDir = [Environment]::GetFolderPath("Desktop")
         $Wsh = New-Object -ComObject WScript.Shell
-        $Lnk = $Wsh.CreateShortcut((Join-Path $DesktopDir "Omega Standalone Labs v3.0.lnk"))
+        $Lnk = $Wsh.CreateShortcut((Join-Path $DesktopDir "Omega Standalone Labs v3.0.4.lnk"))
         $Lnk.TargetPath = $LauncherExe
         $Lnk.WorkingDirectory = $RepoRoot
         $Ico = Join-Path $IconsDir "omega_lab.ico"
         if (Test-Path $Ico) { $Lnk.IconLocation = $Ico }
-        $Lnk.Description = "Omega Unified Standalone & R&D Labs v3.0.0"
+        $Lnk.Description = "Omega Unified Standalone & R&D Labs v3.0.4 (14 Stations)"
         $Lnk.Save()
     } catch { }
 }
@@ -293,4 +305,4 @@ if ($CreateDesktopShortcut) {
 if (-not $SkipLaunch) {
     Start-Process -FilePath $LauncherExe -WorkingDirectory $RepoRoot
 }
-Write-Host ">>> [ALL PASS] Unified Suite v3.0.0 Compiled Cleanly!" -ForegroundColor Green
+Write-Host ">>> [ALL PASS] Unified Suite v3.0.4 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green

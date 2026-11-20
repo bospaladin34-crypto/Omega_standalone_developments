@@ -609,6 +609,19 @@ namespace OmegaStandaloneLab
                 "     bit-for-bit GPU==CPU verification on PowerVR DXT-48-1536 and Host DirectCompute GPU.\r\n" +
                 "  3. OmegaShell v1.1.3 GM Integration (:19781 -> :19788):\r\n" +
                 "     Run 'p10 bench', 'p10 daemon', 'p10 lease', '@p10-sensor', '@p10-compute', or '@p10-prime'.\r\n"));
+            list.Add(new ManualChapter("16. OmegaBraidRE v1.2.0 (:19794) — Binary Lifter, #~ CIL & E8 Patch Differ",
+                "OMEGABRAIDRE v1.2.0 (14_omega_braid_re, [Shift+F7]) — BINARY LIFTER & E8 PATCH DIFFER\r\n" +
+                "=======================================================================================\r\n" +
+                "  1. PE32+/PE32/ELF64 Inspector + .pdata Unwind + IAT/EAT + RIP-Relative Strings:\r\n" +
+                "     Maps sections via overflow-safe TryRvaToFileOffset, decodes DataDirectory[3] .pdata\r\n" +
+                "     RUNTIME_FUNCTION + UNWIND_INFO exact [Begin..End) bounds, resolves EAT exports and\r\n" +
+                "     IAT + FF 25 linker thunks inline, and extracts ASCII & UTF-16LE .rdata strings.\r\n" +
+                "  2. ECMA-335 #~ Metadata Tables (TypeDef 0x02 / Field 0x04 / MethodDef 0x06) & CIL Lifter:\r\n" +
+                "     Detects managed .NET assemblies via BSJB, decodes exact Class::Method names, EntryPoint\r\n" +
+                "     tokens, #US string literals, and lifts Tiny/Fat CIL method bodies directly from RVA.\r\n" +
+                "  3. Dual-ISA (x86_64/ARM64) SSA BraidIR + 240-Root E8 Differ + Sheaf #[repr(C)] Structs:\r\n" +
+                "     Strips 83.3% dead EFLAGS clobbers, renders a 60 FPS DirectCompute cs_5_0 8x8 E8 patch\r\n" +
+                "     heatmap, and exports lockstep Rust #[repr(C)], C++23 static_assert, and C# structs.\r\n"));
             return list;
         }
     }

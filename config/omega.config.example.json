@@ -1,5 +1,5 @@
 {
-  "suite_version": "3.0.0",
+  "suite_version": "3.0.4",
   "host_alias": "AUTO_DETECT_HOSTNAME",
   "gpu_label": "AUTO_DETECT_DXGI",
   "gpu_vram_mb": 0,

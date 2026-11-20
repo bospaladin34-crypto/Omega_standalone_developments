@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag to publish (e.g. v3.0.3)'
+        description: 'Release tag to publish (e.g. v3.0.4)'
         required: false
-        default: 'v3.0.3'
+        default: 'v3.0.4'
 
 permissions:
   contents: read
@@ -32,8 +32,9 @@ jobs:
         shell: pwsh
         run: |
           $Tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
-          if ([string]::IsNullOrWhiteSpace($Tag)) { $Tag = "v3.0.3" }
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Package-ReleaseBundle.ps1 -Version $Tag -BaselineCommit "ff09a73"
+          if ([string]::IsNullOrWhiteSpace($Tag)) { $Tag = "v3.0.4" }
+          $ShaShort = (& git rev-parse --short HEAD).Trim()
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Package-ReleaseBundle.ps1 -Version $Tag -BaselineCommit $ShaShort
           if ($LASTEXITCODE -ne 0) { throw "Package-ReleaseBundle.ps1 failed ($LASTEXITCODE)" }
           "tag=$Tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
@@ -59,7 +60,6 @@ jobs:
               "User-Agent"           = "OmegaStandaloneLabs-ReleasePublisher"
           }
 
-          # Idempotent Create-or-Update Release for $Tag
           $Release = $null
           try {
               $Release = Invoke-RestMethod -Method Get -Uri "https://api.github.com/repos/$Repo/releases/tags/$Tag" -Headers $Headers

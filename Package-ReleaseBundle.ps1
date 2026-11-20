@@ -1,10 +1,17 @@
 param(
-    [string]$Version = "v3.0.3",
-    [string]$BaselineCommit = "ff09a73",
+    [string]$Version = "v3.0.4",
+    [string]$BaselineCommit = "",
     [switch]$SkipRebuild
 )
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($BaselineCommit)) {
+    try {
+        $BaselineCommit = (& git -C $RepoRoot rev-parse --short HEAD 2>$null | Out-String).Trim()
+    } catch { }
+    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.4" }
+}
+
 $DistDir  = Join-Path $RepoRoot "dist"
 $StageDir = Join-Path $DistDir ("Omega_Standalone_Labs_" + $Version + "_win-x64")
 $ZipName  = "Omega_Standalone_Labs_" + $Version + "_win-x64_Prebuilt.zip"
@@ -29,7 +36,7 @@ New-Item -ItemType Directory -Force -Path $StageDir | Out-Null
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 
-# 1. Stage all 14 compiled Windows x64 station binaries in exact canonical folder layout
+# 1. Stage all 14 compiled Windows x64 binaries (Deck + Stations 01..10, 12..14) in canonical layout
 $RequiredBinaries = @(
     "OmegaLabLauncher.exe",
     "01_omega_mirror\OmegaMirror.exe",
@@ -43,7 +50,8 @@ $RequiredBinaries = @(
     "09_omega_forge\OmegaForge.exe",
     "10_omega_shell\OmegaShell.exe",
     "12_omega_conductor\OmegaConductor.exe",
-    "13_omega_tensor\OmegaTensor.exe"
+    "13_omega_tensor\OmegaTensor.exe",
+    "14_omega_braid_re\OmegaBraidRE.exe"
 )
 
 foreach ($relBin in $RequiredBinaries) {
@@ -56,7 +64,6 @@ foreach ($relBin in $RequiredBinaries) {
     Copy-Item -Path $srcBin -Destination $dstBin -Force
 }
 
-# Copy optional WebView2 runtime wrapper DLLs ONLY if they were linked into 02_omega_browser
 foreach ($wvDll in @("Microsoft.Web.WebView2.Core.dll","Microsoft.Web.WebView2.WinForms.dll","WebView2Loader.dll")) {
     $srcDll = Join-Path $RepoRoot ("02_omega_browser\" + $wvDll)
     if (Test-Path $srcDll) {
@@ -64,8 +71,6 @@ foreach ($wvDll in @("Microsoft.Web.WebView2.Core.dll","Microsoft.Web.WebView2.W
     }
 }
 
-# 2. Stage static runtime assets, icons, portable config template, edge worker sources & launcher scripts
-#    (NEVER stage gitignored config/omega.config.json!)
 $RootFiles = @("README.md","LICENSE","Init-OmegaHardware.ps1","Build-OmegaLabs.ps1","Start-OmegaLabs.ps1")
 foreach ($rf in $RootFiles) {
     $srcRf = Join-Path $RepoRoot $rf
@@ -95,21 +100,22 @@ if (Test-Path (Join-Path $RepoRoot "11_omega_edge_workers")) {
     if (Test-Path $edgeBin) { Remove-Item $edgeBin -Recurse -Force }
 }
 
-# Ensure clean empty runtime folders exist inside the zip
+if (Test-Path (Join-Path $RepoRoot "14_omega_braid_re\c11_cli\omega_braid_re_cli.c")) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $StageDir "14_omega_braid_re\c11_cli") | Out-Null
+    Copy-Item -Path (Join-Path $RepoRoot "14_omega_braid_re\c11_cli\omega_braid_re_cli.c") -Destination (Join-Path $StageDir "14_omega_braid_re\c11_cli\omega_braid_re_cli.c") -Force
+}
+
 foreach ($emptyDir in @("downloads","corpus","bridge_export","workspace")) {
     New-Item -ItemType Directory -Force -Path (Join-Path $StageDir $emptyDir) | Out-Null
 }
 
-# Security Gate on Staged Bundle: verify config/omega.config.json is NOT present
 if (Test-Path (Join-Path $StageDir "config\omega.config.json")) {
     Remove-Item (Join-Path $StageDir "config\omega.config.json") -Force
 }
 
-# 3. Compress Prebuilt Windows x64 Release Zip
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($StageDir, $ZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $true)
 
-# 4. Compute SHA256SUMS.txt across the Zip Archive AND all 14 Individual Binaries
 $SumLines = New-Object "System.Collections.Generic.List[string]"
 $ZipHash = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $ZipSizeKb = [Math]::Round(((Get-Item $ZipPath).Length / 1024.0), 1)
@@ -130,21 +136,19 @@ foreach ($relBin in $RequiredBinaries) {
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($SumsPath, (($SumLines -join [string][char]10) + [string][char]10), $Utf8NoBom)
 
-# 5. Emit Markdown Release Notes with Embedded SHA-256 Checksum Table
 $NotesLines = @(
-    "## Unified Omega Standalone & R&D Labs $Version GM (Windows x64)",
+    "## Unified Omega Standalone & R&D Labs $Version GM (Windows x64 — 14 Stations)",
     "",
     "**Verified Source Baseline:** '$BaselineCommit' on 'vesper_production'",
-    "**Architecture:** Zero-NuGet Windows C# 5.0 ('csc.exe' x64) + Zero-Crate '#![no_std]' Rust ('10/10' invariant tests) + DirectCompute 'cs_5_0' + Universal C11 Edge Worker",
+    "**Architecture:** Zero-NuGet Windows C# 5.0 ('csc.exe' x64) + Zero-Crate '#![no_std]' Rust ('15/15' invariant tests across 2 crates) + DirectCompute 'cs_5_0' + Universal C11 Edge & RE Engines",
+    "",
+    "### What's New in $Version",
+    "- **Station 14 — OmegaBraidRE v1.2.0 (':19794'):** Clean-room PE32+/PE32/ELF64 inspector, exact '.pdata' 'RUNTIME_FUNCTION' unwind bounds, 'IAT'/'EAT' + 'FF 25' thunk resolver, 'RIP'-relative ASCII/UTF-16LE strings, ECMA-335 '#~' 'TypeDef'/'MethodDef' CIL lifter, 240-root Conway-Sloane 'E8' cross-patch function differ, Cellular Sheaf 'H^1 = 0' Rust/C++23/C# struct synthesizer, and post-'D3DCompile' working-set trim ('3.1 MB' CLI / '1.3 MB' trimmed GUI).",
+    "- **Unified 14-Station Master Deck (':19800'):** Wired 'OmegaBraidRE' ('[Shift+F4]'), live RAM/status polling, procedural 'omega_braid_re.ico', Vault export shortcut, and ADB ':19794' tunnel into 'OmegaLabLauncher.exe'.",
     "",
     "### Quick Run (Zero Compilation Needed)",
     "1. Download **'$ZipName'** below (and optionally verify against 'SHA256SUMS.txt': 'certutil -hashfile $ZipName SHA256').",
-    "2. Extract anywhere on Windows 10 or Windows 11 and double-click **'OmegaLabLauncher.exe'** (or run '.\Init-OmegaHardware.ps1' first to save a custom 'config\omega.config.json' profile).",
-    "",
-    "### Verified Audit Highlights",
-    "- **14/14 Native Binaries Built & Verified:** Master Deck (':19800') + Stations '01..13' ('39 KB' to '473.5 KB' per binary, zero external NuGet dependencies).",
-    "- **11/11 Headless Stress Suites Passed:** '301,910+' deterministic + randomized trials across Seqlock WAL/MMF buses, Extended Golay '[24,12,8]' & Golay-64 radar pairs, Conway-Sloane 'E8' quantization, Cellular Sheaf 'H^1' FFI/Quest/AOB verification, and Supply-Chain Lockfile Firewall.",
-    "- **Sub-70 MB Native Footprint:** '3.0 MB' to '17.8 MB' trimmed CLI working sets.",
+    "2. Extract anywhere on Windows 10 or Windows 11 and double-click **'OmegaLabLauncher.exe'**.",
     "",
     "### SHA-256 Checksums",
     "| Artifact / Binary | Size | SHA-256 |",
@@ -153,7 +157,6 @@ $NotesLines = @(
 
 [System.IO.File]::WriteAllText($NotesPath, (($NotesLines -join [string][char]10) + [string][char]10), $Utf8NoBom)
 
-# Clean staging folder so only clean release artifacts remain in dist/
 Remove-Item $StageDir -Recurse -Force
 
 Write-Host ("  [BUNDLE READY] {0} ({1} KB)" -f $ZipPath, $ZipSizeKb) -ForegroundColor Green
