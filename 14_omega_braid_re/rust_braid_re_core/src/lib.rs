@@ -783,6 +783,65 @@ pub fn count_dead_flags_eliminated(block_ops: &[(bool, bool, bool)], flags_live_
     (total_set, killed)
 }
 
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PdbMsf7Header {
+    pub valid: bool,
+    pub block_size: u32,
+    pub num_blocks: u32,
+    pub num_dir_bytes: u32,
+    pub block_map_addr: u32,
+}
+
+pub fn parse_pdb_msf7_superblock(buf: &[u8]) -> PdbMsf7Header {
+    let empty = PdbMsf7Header { valid: false, block_size: 0, num_blocks: 0, num_dir_bytes: 0, block_map_addr: 0 };
+    const MAGIC: &[u8; 32] = b"Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
+    if buf.len() < 56 { return empty; }
+    let mut i = 0usize;
+    while i < 32 {
+        if buf[i] != MAGIC[i] { return empty; }
+        i += 1;
+    }
+    let block_size = rd_u32_le(buf, 32);
+    let num_blocks = rd_u32_le(buf, 40);
+    let num_dir_bytes = rd_u32_le(buf, 44);
+    let block_map_addr = rd_u32_le(buf, 52);
+    let valid_blk = block_size == 512 || block_size == 1024 || block_size == 2048 || block_size == 4096;
+    PdbMsf7Header { valid: valid_blk && num_dir_bytes >= 4, block_size, num_blocks, num_dir_bytes, block_map_addr }
+}
+
+pub fn compute_x64_safe_steal_len(code: &[u8], min_bytes: usize) -> usize {
+    let mut off = 0usize;
+    while off < code.len() && off < min_bytes {
+        if off + 4 <= code.len() && code[off] == 0xF3 && code[off + 1] == 0x0F && code[off + 2] == 0x1E && code[off + 3] == 0xFA {
+            off += 4;
+            continue;
+        }
+        let start = off;
+        if code[off] >= 0x40 && code[off] <= 0x4F { off += 1; }
+        if off >= code.len() { break; }
+        let op = code[off]; off += 1;
+        if op == 0x90 || op == 0xC3 || (op >= 0x50 && op <= 0x5F) { continue; }
+        if op == 0xE8 || op == 0xE9 { off += 4; continue; }
+        if off < code.len() {
+            let modrm = code[off]; off += 1;
+            let md = (modrm >> 6) & 3;
+            let rm = modrm & 7;
+            if md != 3 && rm == 4 && off < code.len() {
+                let sib = code[off]; off += 1;
+                if md == 0 && (sib & 7) == 5 { off += 4; }
+            }
+            if md == 0 && rm == 5 { off += 4; }
+            else if md == 1 { off += 1; }
+            else if md == 2 { off += 4; }
+            if op == 0x83 { off += 1; }
+            else if op == 0x81 || op == 0xC7 { off += 4; }
+        }
+        if off == start { break; }
+    }
+    if off > code.len() { code.len() } else { off }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -948,5 +1007,35 @@ mod tests {
         let rep = solve_sheaf_struct_layout(&clean);
         assert_eq!(rep.h1_overlap_defects, 0);
         assert_eq!(rep.aligned_struct_size, 0x28);
+    }
+
+    #[test]
+    fn test_pdb_msf7_superblock_decoder() {
+        let mut hdr = [0u8; 64];
+        let magic = b"Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
+        hdr[0..32].copy_from_slice(magic);
+        hdr[32..36].copy_from_slice(&4096u32.to_le_bytes());
+        hdr[40..44].copy_from_slice(&7u32.to_le_bytes());
+        hdr[44..48].copy_from_slice(&32u32.to_le_bytes());
+        hdr[52..56].copy_from_slice(&3u32.to_le_bytes());
+        let p = parse_pdb_msf7_superblock(&hdr);
+        assert!(p.valid);
+        assert_eq!(p.block_size, 4096);
+        assert_eq!(p.num_blocks, 7);
+        assert_eq!(p.block_map_addr, 3);
+    }
+
+    #[test]
+    fn test_skse64_f4se_x64_safe_prologue_steal() {
+        // mov [rsp+8], rbx (5B) | sub rsp, 0x20 (4B) | mov rbx, rcx (3B) | mov eax, [rbx+8] (3B)
+        let prologue = [
+            0x48u8, 0x89, 0x5C, 0x24, 0x08,
+            0x48, 0x83, 0xEC, 0x20,
+            0x48, 0x89, 0xCB,
+            0x8B, 0x43, 0x08,
+            0xC3,
+        ];
+        assert_eq!(compute_x64_safe_steal_len(&prologue, 5), 5);
+        assert_eq!(compute_x64_safe_steal_len(&prologue, 14), 15);
     }
 }

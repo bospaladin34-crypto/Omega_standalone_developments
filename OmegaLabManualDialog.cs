@@ -609,8 +609,8 @@ namespace OmegaStandaloneLab
                 "     bit-for-bit GPU==CPU verification on PowerVR DXT-48-1536 and Host DirectCompute GPU.\r\n" +
                 "  3. OmegaShell v1.1.3 GM Integration (:19781 -> :19788):\r\n" +
                 "     Run 'p10 bench', 'p10 daemon', 'p10 lease', '@p10-sensor', '@p10-compute', or '@p10-prime'.\r\n"));
-            list.Add(new ManualChapter("16. OmegaBraidRE v1.2.1 (:19794) — Binary Lifter, #~ CIL & E8 Patch Differ",
-                "OMEGABRAIDRE v1.2.1 (14_omega_braid_re, [Shift+F7]) — BINARY LIFTER & E8 PATCH DIFFER\r\n" +
+            list.Add(new ManualChapter("16. OmegaBraidRE v1.3.0 (:19794) — Binary Lifter, #~ CIL & E8 Patch Differ",
+                "OMEGABRAIDRE v1.3.0 (14_omega_braid_re, [Shift+F7]) — BINARY LIFTER & E8 PATCH DIFFER\r\n" +
                 "=======================================================================================\r\n" +
                 "  1. PE32+/PE32/ELF64 Inspector + .pdata Unwind + IAT/EAT + RIP-Relative Strings:\r\n" +
                 "     Maps sections via overflow-safe TryRvaToFileOffset, decodes DataDirectory[3] .pdata\r\n" +

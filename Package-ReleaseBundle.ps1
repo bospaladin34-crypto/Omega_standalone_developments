@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v3.0.5",
+    [string]$Version = "v3.0.6",
     [string]$BaselineCommit = "",
     [switch]$SkipRebuild
 )
@@ -9,7 +9,7 @@ if ([string]::IsNullOrWhiteSpace($BaselineCommit)) {
     try {
         $BaselineCommit = (& git -C $RepoRoot rev-parse --short HEAD 2>$null | Out-String).Trim()
     } catch { }
-    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.5" }
+    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.6" }
 }
 
 $DistDir  = Join-Path $RepoRoot "dist"
@@ -140,11 +140,11 @@ $NotesLines = @(
     "## Unified Omega Standalone & R&D Labs $Version GM (Windows x64 — 14 Stations)",
     "",
     "**Verified Source Baseline:** '$BaselineCommit' on 'vesper_production'",
-    "**Architecture:** Zero-NuGet Windows C# 5.0 ('csc.exe' x64) + Zero-Crate '#![no_std]' Rust ('15/15' invariant tests across 2 crates) + DirectCompute 'cs_5_0' + Universal C11 Edge & RE Engines",
+    "**Architecture:** Zero-NuGet Windows C# 5.0 ('csc.exe' x64) + Zero-Crate '#![no_std]' Rust ('17/17' invariant tests across 2 crates) + DirectCompute 'cs_5_0' + Universal C11 Edge & RE Engines",
     "",
     "### What's New in $Version",
-    "- **Station 14 — OmegaBraidRE v1.2.1 (':19794'):** Clean-room PE32+/PE32/ELF64 inspector, exact '.pdata' 'RUNTIME_FUNCTION' unwind bounds, 'IAT'/'EAT' + 'FF 25' thunk resolver, 'RIP'-relative ASCII/UTF-16LE strings, ECMA-335 '#~' 'TypeDef'/'MethodDef' CIL lifter, 240-root Conway-Sloane 'E8' cross-patch function differ, Cellular Sheaf 'H^1 = 0' Rust/C++23/C# struct synthesizer, and post-'D3DCompile' working-set trim ('3.1 MB' CLI / '1.3 MB' trimmed GUI).",
-    "- **Unified 14-Station Master Deck (':19800'):** Wired 'OmegaBraidRE' ('[Shift+F4]'), live RAM/status polling, procedural 'omega_braid_re.ico', Vault export shortcut, and ADB ':19794' tunnel into 'OmegaLabLauncher.exe'.",
+    "- **Station 14 — OmegaBraidRE v1.3.0 (':19794'):** Clean-room PE32+/PE32/ELF64 inspector, exact '.pdata' 'RUNTIME_FUNCTION' unwind bounds, 'IAT'/'EAT' + 'FF 25' thunk resolver, 'RIP'-relative ASCII/UTF-16LE strings, ECMA-335 '#~' 'TypeDef'/'MethodDef' CIL lifter, 240-root Conway-Sloane 'E8' cross-patch function differ, Cellular Sheaf 'H^1 = 0' Rust/C++23/C# struct synthesizer, and post-'D3DCompile' working-set trim ('3.1 MB' CLI / '1.3 MB' trimmed GUI).",
+    "- **Unified 14-Station Master Deck (':19800'):** Wired 'OmegaBraidRE' ('[Shift+F7]'), live RAM/status polling, procedural 'omega_braid_re.ico', Vault export shortcut, and ADB ':19794' tunnel into 'OmegaLabLauncher.exe'.",
     "",
     "### Quick Run (Zero Compilation Needed)",
     "1. Download **'$ZipName'** below (and optionally verify against 'SHA256SUMS.txt': 'certutil -hashfile $ZipName SHA256').",

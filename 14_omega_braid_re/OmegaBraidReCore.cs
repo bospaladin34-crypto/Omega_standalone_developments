@@ -1545,7 +1545,7 @@ namespace OmegaBraidRE
 
             StringBuilder sb = new StringBuilder(2048);
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "// Auto-Synthesized by OmegaBraidRE v1.2.1 | Function: {0} @ 0x{1:X} ({2})",
+                "// Auto-Synthesized by OmegaBraidRE v1.3.0 | Function: {0} @ 0x{1:X} ({2})",
                 fn.Name, fn.BaseRva, fn.Isa));
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "// Cellular Sheaf H^1 Defects = {0} ({1})",

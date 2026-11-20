@@ -37,6 +37,9 @@ namespace OmegaBraidRE
         private readonly RichTextBox _rtbStruct;
         private readonly RichTextBox _rtbDiff;
         private readonly RichTextBox _rtbPeClr;
+        private readonly RichTextBox _rtbHooks;
+        private SymbolResolutionReport _activeSymbols = new SymbolResolutionReport();
+        private byte[] _activeRawImage = new byte[0];
         private readonly Label _lblStatus;
         private readonly System.Windows.Forms.Timer _renderTimer;
         private readonly Stopwatch _animClock = Stopwatch.StartNew();
@@ -62,7 +65,7 @@ namespace OmegaBraidRE
             _gpu = new OmegaBraidReDirectComputeGpu();
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "OmegaBraidRE v1.2.1 :: Zero-Crate PE .pdata / IAT / EAT / RIP-Strings / ECMA-335 #~ CIL Lifter & E8 Differ (:" + DefaultPort + ")";
+            Text = "OmegaBraidRE v1.3.0 :: Zero-Crate PE .pdata / IAT / EAT / RIP-Strings / ECMA-335 #~ CIL Lifter & E8 Differ (:" + DefaultPort + ")";
             ClientSize = new Size(1220, 840);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = C(9, 13, 22);
@@ -79,30 +82,36 @@ namespace OmegaBraidRE
             catch { }
 
             Label hdr = new Label();
-            hdr.Text = "14. OMEGABRAIDRE v1.2.1 :: PE .PDATA + IAT/EAT + RIP-STRINGS + ECMA-335 #~ TYPEDEF/METHODDEF CIL + E8 DIFFER + SHEAF #[repr(C)]";
+            hdr.Text = "14. OMEGABRAIDRE v1.3.0 :: PE .PDATA + IAT/EAT + RIP-STRINGS + ECMA-335 #~ TYPEDEF/METHODDEF CIL + E8 DIFFER + SHEAF #[repr(C)]";
             hdr.SetBounds(16, 10, 1188, 20);
             hdr.Font = new Font("Segoe UI Semibold", 11.2f, FontStyle.Bold, GraphicsUnit.Pixel);
             hdr.ForeColor = C(56, 189, 248);
 
-            Button bDemoX64 = MakeBtn("8-Fn Patch v1->v2", 16, 36, 146, C(3, 105, 161));
+            Button bDemoX64 = MakeBtn("8-Fn Patch v1->v2", 16, 36, 128, C(3, 105, 161));
             bDemoX64.Click += delegate { LoadBuiltInX64PatchDemo(); };
 
-            Button bDemoPe = MakeBtn("PE .pdata+IAT+EAT+RIP Demo", 168, 36, 206, C(14, 116, 144));
+            Button bDemoPe = MakeBtn("PE .pdata+PDB Demo", 149, 36, 150, C(14, 116, 144));
             bDemoPe.Click += delegate { LoadSyntheticFullPeDemo(); };
 
-            Button bDemoClr = MakeBtn("Self-Inspect .NET #~ CIL", 380, 36, 174, C(15, 118, 110));
+            Button bDemoClr = MakeBtn("Self-Inspect #~ CIL", 304, 36, 144, C(15, 118, 110));
             bDemoClr.Click += delegate { LoadSingleBinaryFile(Assembly.GetExecutingAssembly().Location); _tabs.SelectedIndex = 3; };
 
-            Button bOpenBin = MakeBtn("Open PE / ELF (.exe/.dll/.so)", 560, 36, 198, C(109, 40, 217));
+            Button bOpenBin = MakeBtn("Open PE/ELF/PDB", 453, 36, 136, C(109, 40, 217));
             bOpenBin.Click += delegate { PromptInspectSingleBinary(); };
 
-            Button bDiffBins = MakeBtn("Diff Binary A vs B", 764, 36, 148, C(67, 56, 202));
+            Button bDiffBins = MakeBtn("Diff A vs B", 594, 36, 102, C(67, 56, 202));
             bDiffBins.Click += delegate { PromptDiffTwoBinaries(); };
 
-            Button bAudit = MakeBtn("13-Vector Audit", 918, 36, 134, C(5, 150, 105));
+            Button bAttachPid = MakeBtn("Attach Live PID", 701, 36, 126, C(190, 24, 93));
+            bAttachPid.Click += delegate { PromptAttachLiveProcess(); };
+
+            Button bHooksTab = MakeBtn("SKSE64/F4SE Hooks", 832, 36, 136, C(147, 51, 234));
+            bHooksTab.Click += delegate { _tabs.SelectedIndex = 4; RenderSymbolsAndHooksText(); };
+
+            Button bAudit = MakeBtn("16-Vec Audit", 973, 36, 108, C(5, 150, 105));
             bAudit.Click += delegate { RunInteractiveAuditPopup(); };
 
-            Button bExport = MakeBtn("Export .rs/.hpp/.json", 1058, 36, 146, C(180, 83, 9));
+            Button bExport = MakeBtn("Export Hooks", 1086, 36, 118, C(180, 83, 9));
             bExport.Click += delegate { ExportRecoveredArtifacts(); };
 
             _gpuPanel = new Panel();
@@ -150,17 +159,22 @@ namespace OmegaBraidRE
             _tabs.TabPages.Add(tpSsa);
             _tabs.TabPages.Add(tpStruct);
             _tabs.TabPages.Add(tpDiff);
+            TabPage tpHooks = new TabPage("5. PDB/DWARF + SKSE64/F4SE Hooks");
+            _rtbHooks = MakeCodeBox();
+            tpHooks.Controls.Add(_rtbHooks);
+
             _tabs.TabPages.Add(tpPeClr);
+            _tabs.TabPages.Add(tpHooks);
 
             _lblStatus = new Label();
             _lblStatus.SetBounds(16, 804, 1188, 24);
             _lblStatus.Font = new Font("Consolas", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
             _lblStatus.ForeColor = C(52, 211, 153);
-            _lblStatus.Text = "Initializing OmegaBraidRE v1.2.1...";
+            _lblStatus.Text = "Initializing OmegaBraidRE v1.3.0...";
 
             Controls.AddRange(new Control[]
             {
-                hdr, bDemoX64, bDemoPe, bDemoClr, bOpenBin, bDiffBins, bAudit, bExport,
+                hdr, bDemoX64, bDemoPe, bDemoClr, bOpenBin, bDiffBins, bAttachPid, bHooksTab, bAudit, bExport,
                 _gpuPanel, _lvFunctions, _tabs, _lblStatus
             });
 
@@ -311,7 +325,9 @@ namespace OmegaBraidRE
         private void LoadSyntheticFullPeDemo()
         {
             byte[] pe = OmegaBraidReStressSuite.BuildSyntheticFullPe32PlusImage();
+            _activeRawImage = pe;
             _activeContainer = OmegaBraidReCore.InspectContainer(pe);
+            _activeSymbols = OmegaBraidReSymbolsAndHooks.ParsePdbMsf7Symbols(OmegaBraidReSymbolsAndHooks.BuildSyntheticPdbMsf7(), _activeContainer);
             _oldFuncs = OmegaBraidReCore.AutoDiscoverFunctionsWithReport(pe, _activeContainer, 24);
             _newFuncs = new List<LiftedBraidFunction>(_oldFuncs);
             _activeSourceLabel = "Synthetic SovereignPerfF4SE.dll [PE32+ | .pdata=2 | EAT=2 | IAT=2 | ASCII+UTF16 RIP]";
@@ -354,7 +370,9 @@ namespace OmegaBraidRE
             try
             {
                 byte[] raw = File.ReadAllBytes(path);
+                _activeRawImage = raw;
                 _activeContainer = OmegaBraidReCore.InspectContainer(raw);
+                ResolveSymbolsForLoadedBinary(path, raw, _activeContainer);
                 _oldFuncs = OmegaBraidReCore.AutoDiscoverFunctionsWithReport(raw, _activeContainer, 64);
                 _newFuncs = new List<LiftedBraidFunction>(_oldFuncs);
                 string modeTag = _activeContainer.ClrInfo.IsClrAssembly
@@ -367,7 +385,7 @@ namespace OmegaBraidRE
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Failed to inspect binary: " + ex.Message, "OmegaBraidRE v1.2.1", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Failed to inspect binary: " + ex.Message, "OmegaBraidRE v1.3.0", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -386,7 +404,7 @@ namespace OmegaBraidRE
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Failed to diff binaries: " + ex.Message, "OmegaBraidRE v1.2.1", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Failed to diff binaries: " + ex.Message, "OmegaBraidRE v1.3.0", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -432,6 +450,7 @@ namespace OmegaBraidRE
 
             RenderDiffReportText();
             RenderPeAndClrTelemetryText();
+            RenderSymbolsAndHooksText();
             if (_lvFunctions.Items.Count > 0) _lvFunctions.Items[0].Selected = true;
 
             // Keep live GUI working set tightly trimmed well below the 70 MB ceiling!
@@ -502,6 +521,7 @@ namespace OmegaBraidRE
             uint alignedSz;
             string safeName = MakeIdentifier(fn.Name) + "Frame";
             _rtbStruct.Text = OmegaBraidReCore.SynthesizePolyglotStructHeaders(fn, safeName, out alignedSz);
+            RenderSymbolsAndHooksText();
         }
 
         private void RenderDiffReportText()
@@ -672,12 +692,168 @@ namespace OmegaBraidRE
             return s.Length > 0 ? s : "RecoveredObject";
         }
 
+        private void ResolveSymbolsForLoadedBinary(string path, byte[] raw, BinaryContainerReport rep)
+        {
+            _activeSymbols = new SymbolResolutionReport();
+            try
+            {
+                if (rep.Format == BraidContainerKind.Elf64)
+                {
+                    _activeSymbols = OmegaBraidReSymbolsAndHooks.ParseElfAndDwarfSymbols(raw);
+                    return;
+                }
+                CodeViewRsdsInfo rsds = OmegaBraidReSymbolsAndHooks.ParsePeCodeViewRsds(raw, rep);
+                _activeSymbols.Rsds = rsds;
+                string siblingPdb = Path.ChangeExtension(path, ".pdb");
+                if (!string.IsNullOrEmpty(siblingPdb) && File.Exists(siblingPdb))
+                {
+                    SymbolResolutionReport pdbRep = OmegaBraidReSymbolsAndHooks.ParsePdbMsf7Symbols(File.ReadAllBytes(siblingPdb), rep);
+                    pdbRep.Rsds = rsds;
+                    _activeSymbols = pdbRep;
+                }
+                else if (rsds.Found && !string.IsNullOrEmpty(rsds.PdbPath) && File.Exists(rsds.PdbPath))
+                {
+                    SymbolResolutionReport pdbRep = OmegaBraidReSymbolsAndHooks.ParsePdbMsf7Symbols(File.ReadAllBytes(rsds.PdbPath), rep);
+                    pdbRep.Rsds = rsds;
+                    _activeSymbols = pdbRep;
+                }
+            }
+            catch { }
+        }
+
+        private void PromptAttachLiveProcess()
+        {
+            List<LiveProcessItem> procs = OmegaBraidReSymbolsAndHooks.ListAttachableProcesses();
+            if (procs.Count == 0)
+            {
+                MessageBox.Show(this, "No readable processes enumerated.", "OmegaBraidRE v1.3.0", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            using (Form dlg = new Form())
+            {
+                dlg.Text = "Attach Read-Only to Live Process Memory (ReadProcessMemory)";
+                dlg.ClientSize = new Size(640, 420);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.BackColor = C(15, 23, 42);
+                dlg.ForeColor = Color.White;
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.MaximizeBox = false;
+                dlg.MinimizeBox = false;
+
+                ListBox lb = new ListBox();
+                lb.SetBounds(12, 12, 616, 356);
+                lb.BackColor = C(9, 13, 22);
+                lb.ForeColor = C(226, 232, 240);
+                lb.Font = new Font("Consolas", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
+                int selfIdx = 0;
+                int myPid;
+                using (Process me = Process.GetCurrentProcess()) { myPid = me.Id; }
+                for (int i = 0; i < procs.Count; i++)
+                {
+                    lb.Items.Add(procs[i]);
+                    if (procs[i].Pid == myPid) selfIdx = i;
+                }
+                lb.SelectedIndex = selfIdx;
+
+                Button bOk = MakeBtn("Attach Read-Only", 360, 378, 150, C(190, 24, 93));
+                bOk.DialogResult = DialogResult.OK;
+                Button bCan = MakeBtn("Cancel", 518, 378, 110, C(51, 65, 85));
+                bCan.DialogResult = DialogResult.Cancel;
+                dlg.AcceptButton = bOk;
+                dlg.CancelButton = bCan;
+                dlg.Controls.AddRange(new Control[] { lb, bOk, bCan });
+
+                if (dlg.ShowDialog(this) == DialogResult.OK && lb.SelectedItem is LiveProcessItem)
+                {
+                    LiveProcessItem sel = (LiveProcessItem)lb.SelectedItem;
+                    LiveMemorySnapshot snap = OmegaBraidReSymbolsAndHooks.ReadLiveProcessPeImage(sel.Pid, 4 * 1024 * 1024);
+                    if (!snap.Success)
+                    {
+                        MessageBox.Show(this, snap.ErrorMessage, "Live Read-Only Attach", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    _activeRawImage = snap.PeImageBuffer;
+                    _activeContainer = OmegaBraidReCore.InspectContainer(snap.PeImageBuffer);
+                    ResolveSymbolsForLoadedBinary(sel.ModulePath, snap.PeImageBuffer, _activeContainer);
+                    _oldFuncs = OmegaBraidReCore.AutoDiscoverFunctionsWithReport(snap.PeImageBuffer, _activeContainer, 64);
+                    _newFuncs = new List<LiftedBraidFunction>(_oldFuncs);
+                    _activeSourceLabel = string.Format(CultureInfo.InvariantCulture,
+                        "LIVE PID {0} ({1} @ 0x{2:X} | {3} KB read)", sel.Pid, snap.ProcessName, snap.BaseAddress, snap.BytesRead / 1024);
+                    RefreshTablesAndViews();
+                    _tabs.SelectedIndex = 3;
+                }
+            }
+        }
+
+        private void RenderSymbolsAndHooksText()
+        {
+            if (_rtbHooks == null) return;
+            StringBuilder sb = new StringBuilder(3072);
+            sb.AppendLine("=== OMEGABRAIDRE v1.3.0 :: PDB MSF 7.00 / DWARF SYMBOLS & MOD CITY SKSE64/F4SE HOOK CODEGEN ===");
+            if (_activeSymbols.Rsds != null && _activeSymbols.Rsds.Found)
+            {
+                sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "PE CodeView RSDS : GUID={0} | Age={1} | PDB={2}",
+                    _activeSymbols.Rsds.GuidHex, _activeSymbols.Rsds.Age, _activeSymbols.Rsds.PdbPath));
+            }
+            if (!string.IsNullOrEmpty(_activeSymbols.SummaryLine))
+            {
+                sb.AppendLine("Debug Symbols    : " + _activeSymbols.SummaryLine);
+            }
+            if (_activeSymbols.Symbols.Count > 0)
+            {
+                int showN = Math.Min(24, _activeSymbols.Symbols.Count);
+                sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "--- RESOLVED DEBUG SYMBOLS (showing {0} of {1}) ---", showN, _activeSymbols.Symbols.Count));
+                for (int i = 0; i < showN; i++)
+                {
+                    DebugSymbolEntry ds = _activeSymbols.Symbols[i];
+                    sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                        "  [{0,-13}] RVA/VA=0x{1:X8}  Len=0x{2:X4}  {3}", ds.Source, ds.RvaOrVa, ds.CodeSize, ds.Name));
+                }
+                sb.AppendLine();
+            }
+
+            LiftedBraidFunction fn = (_lvFunctions.SelectedItems.Count > 0)
+                ? (_lvFunctions.SelectedItems[0].Tag as LiftedBraidFunction)
+                : (_oldFuncs.Count > 0 ? _oldFuncs[0] : null);
+
+            byte[] sampleCode = OmegaBraidReStressSuite.GetSampleActorV1Bytes();
+            string fnName = (fn != null) ? fn.Name : "Actor::UpdatePhysics";
+            ulong fnRva = (fn != null) ? fn.BaseRva : 0x12000UL;
+            if (fn != null && fn.BaseRva >= _activeContainer.ImageBase && _activeContainer.ImageBase > 0UL)
+            {
+                fnRva = fn.BaseRva - _activeContainer.ImageBase;
+            }
+            int fileOff;
+            if (_activeRawImage != null && _activeRawImage.Length > 64 && fnRva > 0UL &&
+                OmegaBraidRePeAndClr.TryRvaToFileOffset(_activeRawImage, _activeContainer.Sections, (uint)fnRva, out fileOff) &&
+                fileOff + 32 <= _activeRawImage.Length)
+            {
+                sampleCode = new byte[32];
+                Buffer.BlockCopy(_activeRawImage, fileOff, sampleCode, 0, 32);
+            }
+
+            TrampolineProloguePlan plan = OmegaBraidReSymbolsAndHooks.AnalyzeTrampolinePrologue(fnName, fnRva, sampleCode);
+            sb.AppendLine("--- x86_64 INSTRUCTION-BOUNDARY PROLOGUE ANALYSIS ---");
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                "Target: {0} @ RVA 0x{1:X} | 5B-Steal={2}B ({3} insns) | 14B-Steal={4}B ({5} insns) | RIP-Rel={6}",
+                plan.FunctionName, plan.TargetRva, plan.Rel32StealBytes, plan.StolenInsnCount5,
+                plan.Abs64StealBytes, plan.StolenInsnCount14, plan.HasRipRelativeInSteal14 ? "YES (RELOC)" : "NONE"));
+            sb.AppendLine("Strategy: " + plan.SafeHookStrategy);
+            for (int i = 0; i < plan.DisassembledPrologue.Count; i++) sb.AppendLine("  " + plan.DisassembledPrologue[i]);
+            sb.AppendLine();
+            sb.AppendLine(OmegaBraidReSymbolsAndHooks.EmitSkse64F4seCpp23Plugin(fn, plan, "SkyrimSE / Fallout4"));
+            sb.AppendLine();
+            sb.AppendLine(OmegaBraidReSymbolsAndHooks.EmitSkse64F4seRustNoStdPlugin(fn, plan));
+            _rtbHooks.Text = sb.ToString();
+        }
+
         private void RunInteractiveAuditPopup()
         {
-            BraidStressSummary sum = OmegaBraidReStressSuite.RunAll13Vectors();
+            BraidStressSummary sum = OmegaBraidReStressSuite.RunAll16Vectors();
             StringBuilder sb = new StringBuilder(1792);
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "OMEGABRAIDRE v1.2.1 AUDIT: {0}/{1} PASSED ({2} trials in {3:0.0} ms | Trimmed RAM: {4:0.0} MB)",
+                "OMEGABRAIDRE v1.3.0 AUDIT: {0}/{1} PASSED ({2} trials in {3:0.0} ms | Trimmed RAM: {4:0.0} MB)",
                 sum.PassedCount, sum.TotalCount, sum.TotalTrials, sum.TotalMs, sum.TrimmedWorkingSetMb));
             sb.AppendLine();
             for (int i = 0; i < sum.Vectors.Count; i++)
@@ -686,7 +862,7 @@ namespace OmegaBraidRE
                 sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "[{0}] {1}: {2}",
                     v.Passed ? "PASS" : "FAIL", v.Code, v.Detail));
             }
-            MessageBox.Show(this, sb.ToString(), "OmegaBraidRE v1.2.1 13-Vector Verification", MessageBoxButtons.OK,
+            MessageBox.Show(this, sb.ToString(), "OmegaBraidRE v1.3.0 16-Vector Verification", MessageBoxButtons.OK,
                 sum.AllPassed ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
@@ -701,10 +877,11 @@ namespace OmegaBraidRE
                 File.WriteAllText(Path.Combine(outDir, "recovered_sheaf_structs.rs"), _rtbStruct.Text, utf8NoBom);
                 File.WriteAllText(Path.Combine(outDir, "lifted_ssa_braidir_dump.txt"), _rtbSsa.Text, utf8NoBom);
                 File.WriteAllText(Path.Combine(outDir, "pe_pdata_iat_eat_clr_report.txt"), _rtbPeClr.Text, utf8NoBom);
+                File.WriteAllText(Path.Combine(outDir, "omega_skse64_f4se_hooks_and_symbols.hpp"), _rtbHooks.Text, utf8NoBom);
 
                 StringBuilder jb = new StringBuilder(2048);
                 jb.AppendLine("{");
-                jb.AppendLine("  \"tool\": \"OmegaBraidRE v1.2.1\",");
+                jb.AppendLine("  \"tool\": \"OmegaBraidRE v1.3.0\",");
                 jb.AppendLine("  \"migrations\": [");
                 for (int i = 0; i < _diffEntries.Count; i++)
                 {
@@ -722,7 +899,7 @@ namespace OmegaBraidRE
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Export error: " + ex.Message, "OmegaBraidRE v1.2.1", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Export error: " + ex.Message, "OmegaBraidRE v1.3.0", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -809,9 +986,9 @@ namespace OmegaBraidRE
                     {
                         try
                         {
-                            BraidStressSummary sum = OmegaBraidReStressSuite.RunAll13Vectors();
+                            BraidStressSummary sum = OmegaBraidReStressSuite.RunAll16Vectors();
                             Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-                                "[OMEGABRAIDRE v1.2.1 13-VECTOR AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.0} MB ({4:0.0} ms)",
+                                "[OMEGABRAIDRE v1.3.0 16-VECTOR AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.0} MB ({4:0.0} ms)",
                                 sum.PassedCount, sum.TotalCount, sum.TotalTrials, sum.TrimmedWorkingSetMb, sum.TotalMs));
                             for (int k = 0; k < sum.Vectors.Count; k++)
                             {
