@@ -19,6 +19,12 @@ namespace OmegaBraidRE
     {
         [DllImport("user32.dll")]
         private static extern bool SetProcessDPIAware();
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
 
         public const int DefaultPort = 19794;
 
@@ -56,11 +62,12 @@ namespace OmegaBraidRE
             _gpu = new OmegaBraidReDirectComputeGpu();
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "OmegaBraidRE v1.2.0 :: Zero-Crate PE .pdata / IAT / EAT / RIP-Strings / ECMA-335 #~ CIL Lifter & E8 Differ (:" + DefaultPort + ")";
+            Text = "OmegaBraidRE v1.2.1 :: Zero-Crate PE .pdata / IAT / EAT / RIP-Strings / ECMA-335 #~ CIL Lifter & E8 Differ (:" + DefaultPort + ")";
             ClientSize = new Size(1220, 840);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = C(9, 13, 22);
             ForeColor = Color.White;
+            KeyPreview = true;
             AllowDrop = true;
 
             try
@@ -72,7 +79,7 @@ namespace OmegaBraidRE
             catch { }
 
             Label hdr = new Label();
-            hdr.Text = "14. OMEGABRAIDRE v1.2.0 :: PE .PDATA + IAT/EAT + RIP-STRINGS + ECMA-335 #~ TYPEDEF/METHODDEF CIL + E8 DIFFER + SHEAF #[repr(C)]";
+            hdr.Text = "14. OMEGABRAIDRE v1.2.1 :: PE .PDATA + IAT/EAT + RIP-STRINGS + ECMA-335 #~ TYPEDEF/METHODDEF CIL + E8 DIFFER + SHEAF #[repr(C)]";
             hdr.SetBounds(16, 10, 1188, 20);
             hdr.Font = new Font("Segoe UI Semibold", 11.2f, FontStyle.Bold, GraphicsUnit.Pixel);
             hdr.ForeColor = C(56, 189, 248);
@@ -149,7 +156,7 @@ namespace OmegaBraidRE
             _lblStatus.SetBounds(16, 804, 1188, 24);
             _lblStatus.Font = new Font("Consolas", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
             _lblStatus.ForeColor = C(52, 211, 153);
-            _lblStatus.Text = "Initializing OmegaBraidRE v1.2.0...";
+            _lblStatus.Text = "Initializing OmegaBraidRE v1.2.1...";
 
             Controls.AddRange(new Control[]
             {
@@ -244,6 +251,54 @@ namespace OmegaBraidRE
             }
         }
 
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            Keys kc = keyData & Keys.KeyCode;
+            bool shift = (keyData & Keys.Shift) == Keys.Shift;
+            if (shift && kc == Keys.F7)
+            {
+                SwitchToOrLaunchOmegaDeck();
+                return true;
+            }
+            if (!shift && kc == Keys.F5)
+            {
+                RunInteractiveAuditPopup();
+                return true;
+            }
+            if (!shift && kc == Keys.F6)
+            {
+                try { LoadSingleBinaryFile(Assembly.GetExecutingAssembly().Location); _tabs.SelectedIndex = 3; } catch { }
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void SwitchToOrLaunchOmegaDeck()
+        {
+            try
+            {
+                Process[] ps = Process.GetProcessesByName("OmegaLabLauncher");
+                for (int i = 0; i < ps.Length; i++)
+                {
+                    IntPtr h = ps[i].MainWindowHandle;
+                    if (h != IntPtr.Zero)
+                    {
+                        if (IsIconic(h)) ShowWindow(h, 9);
+                        SetForegroundWindow(h);
+                        return;
+                    }
+                }
+                string deckExe = Path.Combine(_hw.LabRoot, "OmegaLabLauncher.exe");
+                if (File.Exists(deckExe))
+                {
+                    ProcessStartInfo psi = new ProcessStartInfo(deckExe);
+                    psi.WorkingDirectory = _hw.LabRoot;
+                    Process.Start(psi);
+                }
+            }
+            catch { }
+        }
+
         private void LoadBuiltInX64PatchDemo()
         {
             _activeSourceLabel = "Creation-Engine 8-Fn Patch v1 (1.10.163) -> Rebased/CET/RegSwapped v2 (1.11.240.0)";
@@ -312,7 +367,7 @@ namespace OmegaBraidRE
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Failed to inspect binary: " + ex.Message, "OmegaBraidRE v1.2.0", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Failed to inspect binary: " + ex.Message, "OmegaBraidRE v1.2.1", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -331,7 +386,7 @@ namespace OmegaBraidRE
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Failed to diff binaries: " + ex.Message, "OmegaBraidRE v1.2.0", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Failed to diff binaries: " + ex.Message, "OmegaBraidRE v1.2.1", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -385,8 +440,8 @@ namespace OmegaBraidRE
             double ramMb;
             using (Process p = Process.GetCurrentProcess()) { ramMb = p.WorkingSet64 / (1024.0 * 1024.0); }
             _lblStatus.Text = string.Format(CultureInfo.InvariantCulture,
-                "[{0}] GPU: {1} ({2}) | Funcs: {3} | DeadFlags: {4:0.0}% | RAM: {5:0.0} MB | :{6} LIVE",
-                _activeSourceLabel, _hw.PrimaryGpuName, _gpu.BackendLabel, _oldFuncs.Count, _avgDeadFlagRatio * 100.0f, ramMb, DefaultPort);
+                "[{0}] Funcs: {1} | DeadFlags: {2:0.0}% | RAM: {3:0.0} MB | :{4} LIVE | [Shift+F7=Deck] | GPU: {5}",
+                _activeSourceLabel, _oldFuncs.Count, _avgDeadFlagRatio * 100.0f, ramMb, DefaultPort, _hw.PrimaryGpuName);
         }
 
         private void OnFunctionSelectionChanged(object sender, EventArgs e)
@@ -622,7 +677,7 @@ namespace OmegaBraidRE
             BraidStressSummary sum = OmegaBraidReStressSuite.RunAll13Vectors();
             StringBuilder sb = new StringBuilder(1792);
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "OMEGABRAIDRE v1.2.0 AUDIT: {0}/{1} PASSED ({2} trials in {3:0.0} ms | Trimmed RAM: {4:0.0} MB)",
+                "OMEGABRAIDRE v1.2.1 AUDIT: {0}/{1} PASSED ({2} trials in {3:0.0} ms | Trimmed RAM: {4:0.0} MB)",
                 sum.PassedCount, sum.TotalCount, sum.TotalTrials, sum.TotalMs, sum.TrimmedWorkingSetMb));
             sb.AppendLine();
             for (int i = 0; i < sum.Vectors.Count; i++)
@@ -631,7 +686,7 @@ namespace OmegaBraidRE
                 sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "[{0}] {1}: {2}",
                     v.Passed ? "PASS" : "FAIL", v.Code, v.Detail));
             }
-            MessageBox.Show(this, sb.ToString(), "OmegaBraidRE v1.2.0 13-Vector Verification", MessageBoxButtons.OK,
+            MessageBox.Show(this, sb.ToString(), "OmegaBraidRE v1.2.1 13-Vector Verification", MessageBoxButtons.OK,
                 sum.AllPassed ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
@@ -649,7 +704,7 @@ namespace OmegaBraidRE
 
                 StringBuilder jb = new StringBuilder(2048);
                 jb.AppendLine("{");
-                jb.AppendLine("  \"tool\": \"OmegaBraidRE v1.2.0\",");
+                jb.AppendLine("  \"tool\": \"OmegaBraidRE v1.2.1\",");
                 jb.AppendLine("  \"migrations\": [");
                 for (int i = 0; i < _diffEntries.Count; i++)
                 {
@@ -667,7 +722,7 @@ namespace OmegaBraidRE
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Export error: " + ex.Message, "OmegaBraidRE v1.2.0", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "Export error: " + ex.Message, "OmegaBraidRE v1.2.1", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -756,7 +811,7 @@ namespace OmegaBraidRE
                         {
                             BraidStressSummary sum = OmegaBraidReStressSuite.RunAll13Vectors();
                             Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-                                "[OMEGABRAIDRE v1.2.0 13-VECTOR AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.0} MB ({4:0.0} ms)",
+                                "[OMEGABRAIDRE v1.2.1 13-VECTOR AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.0} MB ({4:0.0} ms)",
                                 sum.PassedCount, sum.TotalCount, sum.TotalTrials, sum.TrimmedWorkingSetMb, sum.TotalMs));
                             for (int k = 0; k < sum.Vectors.Count; k++)
                             {

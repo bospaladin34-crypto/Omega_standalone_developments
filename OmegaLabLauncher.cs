@@ -35,11 +35,32 @@ namespace OmegaStandaloneLab
         [DllImport("user32.dll")] private static extern bool SetProcessDPIAware();
         [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
         [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+        [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+        [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+        [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
         [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
         private const int WM_HSCROLL = 0x0114;
         private const int SB_LEFT = 6;
+        private const int WM_HOTKEY = 0x0312;
+        private const int HK_SHIFT_F7_BRAIDRE = 0xB014;
+        private const int HK_CTRL_SHIFT_F7_BRAIDRE = 0xB015;
+        private const uint MOD_CONTROL = 0x0002;
+        private const uint MOD_SHIFT = 0x0004;
+        private const uint MOD_NOREPEAT = 0x4000;
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_SHOWWINDOW = 0x0040;
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+        private bool _globalShiftF7Armed = false;
+        private bool _globalCtrlShiftF7Armed = false;
         private static readonly string FENCE = new string((char)96, 3);
 
         private readonly string _root, _mrDir, _brDir, _avDir, _syDir, _snDir, _sfDir, _pnDir, _sgDir, _fgDir, _shDir, _p10Dir, _cdDir, _tnDir, _reDir, _dlDir, _mrExe, _brExe, _avExe, _syExe, _snExe, _sfExe, _pnExe, _sgExe, _fgExe, _shExe, _cdExe, _tnExe, _reExe, _harvPs1;
@@ -93,7 +114,7 @@ namespace OmegaStandaloneLab
             Directory.CreateDirectory(_dlDir);
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.4 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
+            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.5 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
             ClientSize = new Size(1124, 924);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -106,7 +127,7 @@ namespace OmegaStandaloneLab
 
             Label sub = new Label();
             sub.UseMnemonic = false;
-            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.4 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.2.0 (:19794) [Shift+F7]";
+            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.5 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.2.0 (:19794) [Shift+F7]";
             sub.SetBounds(18, 8, 1088, 18);
             sub.ForeColor = C(56, 189, 248);
             sub.Font = new Font("Segoe UI Semibold", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -261,10 +282,10 @@ namespace OmegaStandaloneLab
             bTnX.Height = 28;
             bTnX.Click += delegate { StopApps(new string[] { "OmegaTensor" }); };
 
-            Button bRe = Btn("Launch / Focus OmegaBraidRE v1.2.0 (:19794) [Shift+F7]", 18, 578, 348, C(14, 116, 144));
+            Button bRe = Btn("Launch / Focus OmegaBraidRE v1.2.1 (:19794) [Shift+F7]", 18, 578, 348, C(14, 116, 144));
             bRe.Height = 28;
             bRe.FlatAppearance.BorderColor = C(52, 211, 153);
-            bRe.Click += delegate { LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.2.0 (#~ CIL + .pdata + E8)"); };
+            bRe.Click += delegate { LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.2.1 (#~ CIL + .pdata + E8)"); };
             Button bReB = Btn("RE Exports Folder", 374, 578, 176, C(30, 58, 138));
             bReB.Height = 28;
             bReB.Click += delegate { OpenDir(Path.Combine(_dlDir, "omega_braid_re_exports")); };
@@ -525,7 +546,7 @@ namespace OmegaStandaloneLab
             _lAct.ForeColor = C(52, 211, 153);
             _lAct.TextAlign = ContentAlignment.MiddleLeft;
             _lAct.Padding = new Padding(14, 0, 0, 0);
-            _lAct.Text = "Launcher v3.0.4 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
+            _lAct.Text = "Launcher v3.0.5 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
             bot.Controls.Add(_lAct);
 
             Controls.AddRange(new Control[]
@@ -536,7 +557,6 @@ namespace OmegaStandaloneLab
                 gemmaDeck, bot
             });
 
-            KeyDown += OnHotKey;
             _tmr = new System.Windows.Forms.Timer();
             _tmr.Interval = 2200;
             _tmr.Tick += delegate { RefreshAsync(); };
@@ -975,9 +995,101 @@ namespace OmegaStandaloneLab
             });
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            try
+            {
+                _globalShiftF7Armed = RegisterHotKey(Handle, HK_SHIFT_F7_BRAIDRE, MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.F7);
+                if (!_globalShiftF7Armed)
+                {
+                    _globalShiftF7Armed = RegisterHotKey(Handle, HK_SHIFT_F7_BRAIDRE, MOD_SHIFT, (uint)Keys.F7);
+                }
+                _globalCtrlShiftF7Armed = RegisterHotKey(Handle, HK_CTRL_SHIFT_F7_BRAIDRE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.F7);
+                if (_lAct != null)
+                {
+                    _lAct.Text = "Launcher v3.0.5 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
+                        " -> OmegaBraidRE v1.2.1 (:19794) | F1..F4 | F7=Shell | F12=Stop";
+                }
+            }
+            catch { }
+        }
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            try
+            {
+                if (_globalShiftF7Armed) { UnregisterHotKey(Handle, HK_SHIFT_F7_BRAIDRE); _globalShiftF7Armed = false; }
+                if (_globalCtrlShiftF7Armed) { UnregisterHotKey(Handle, HK_CTRL_SHIFT_F7_BRAIDRE); _globalCtrlShiftF7Armed = false; }
+            }
+            catch { }
+            base.OnHandleDestroyed(e);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_HOTKEY)
+            {
+                int hkId = m.WParam.ToInt32();
+                if (hkId == HK_SHIFT_F7_BRAIDRE || hkId == HK_CTRL_SHIFT_F7_BRAIDRE)
+                {
+                    ToggleOrLaunchBraidReHotkey();
+                    return;
+                }
+            }
+            base.WndProc(ref m);
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            Keys kc = keyData & Keys.KeyCode;
+            bool shift = (keyData & Keys.Shift) == Keys.Shift;
+            if (kc >= Keys.F1 && kc <= Keys.F12)
+            {
+                OnHotKey(this, new KeyEventArgs(keyData));
+                return true;
+            }
+            if (shift && kc == Keys.OemQuestion && ActiveControl != _txtGemmaIn)
+            {
+                OpenHumanManual();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void ToggleOrLaunchBraidReHotkey()
+        {
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                Process[] ps = Process.GetProcessesByName("OmegaBraidRE");
+                for (int i = 0; i < ps.Length; i++)
+                {
+                    IntPtr h = ps[i].MainWindowHandle;
+                    if (h != IntPtr.Zero)
+                    {
+                        if (fg == h && Handle != IntPtr.Zero)
+                        {
+                            ForceWindowToForeground(Handle);
+                            SetAct("[Shift+F7] Toggled foreground -> OmegaLabLauncher (:19800)");
+                            return;
+                        }
+                        ForceWindowToForeground(h);
+                        SetAct("[Shift+F7] Focused OmegaBraidRE v1.2.1 (:19794, PID " + ps[i].Id + ")");
+                        return;
+                    }
+                }
+                LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.2.1 GM");
+            }
+            catch (Exception ex)
+            {
+                SetAct("Shift+F7 hotkey error: " + ex.Message);
+            }
+        }
+
         private void OnHotKey(object s, KeyEventArgs e)
         {
-            if (ActiveControl == _txtGemmaIn && e.KeyCode != Keys.F1 && e.KeyCode != Keys.F2 && e.KeyCode != Keys.F3 && e.KeyCode != Keys.F4 && e.KeyCode != Keys.F5 && e.KeyCode != Keys.F6 && e.KeyCode != Keys.F7 && e.KeyCode != Keys.F9 && e.KeyCode != Keys.F10 && e.KeyCode != Keys.F11 && e.KeyCode != Keys.F12)
+            if (ActiveControl == _txtGemmaIn && e.KeyCode != Keys.F1 && e.KeyCode != Keys.F2 && e.KeyCode != Keys.F3 && e.KeyCode != Keys.F4 && e.KeyCode != Keys.F5 && e.KeyCode != Keys.F6 && e.KeyCode != Keys.F7 && e.KeyCode != Keys.F8 && e.KeyCode != Keys.F9 && e.KeyCode != Keys.F10 && e.KeyCode != Keys.F11 && e.KeyCode != Keys.F12)
                 return;
 
             if (e.KeyCode == Keys.F1) LaunchOrFocus("OmegaBrowser", _brExe, "OmegaBrowser v0.6.4");
@@ -988,7 +1100,7 @@ namespace OmegaStandaloneLab
             else if (e.KeyCode == Keys.F5) LaunchFullSuite();
             else if (e.Shift && e.KeyCode == Keys.F6) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaSheaf", _sfExe, "OmegaSheaf v0.2.1 GM"); }
             else if (e.KeyCode == Keys.F6 || (e.Shift && e.KeyCode == Keys.OemQuestion && ActiveControl != _txtGemmaIn)) OpenHumanManual();
-            else if (e.Shift && e.KeyCode == Keys.F7) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.2.0 GM"); }
+            else if (e.Shift && e.KeyCode == Keys.F7) { e.SuppressKeyPress = true; ToggleOrLaunchBraidReHotkey(); }
             else if (e.KeyCode == Keys.F7) LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.1.6 GM");
             else if (e.Shift && e.KeyCode == Keys.F10) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM"); }
             else if (e.KeyCode == Keys.F10) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaSynth", _syExe, "OmegaSynth v1.1.1 Final GM"); }
@@ -1692,6 +1804,37 @@ namespace OmegaStandaloneLab
             else _lAct.Text = clean;
         }
 
+        private static void ForceWindowToForeground(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return;
+            uint dummyPid;
+            IntPtr fg = GetForegroundWindow();
+            uint fgTid = (fg != IntPtr.Zero) ? GetWindowThreadProcessId(fg, out dummyPid) : 0u;
+            uint curTid = GetCurrentThreadId();
+            bool attached = false;
+            try
+            {
+                if (fgTid != 0u && fgTid != curTid)
+                {
+                    attached = AttachThreadInput(curTid, fgTid, true);
+                }
+                if (IsIconic(hWnd)) ShowWindow(hWnd, 9);
+                else ShowWindow(hWnd, 5);
+                SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                BringWindowToTop(hWnd);
+                SetForegroundWindow(hWnd);
+            }
+            catch { }
+            finally
+            {
+                if (attached)
+                {
+                    try { AttachThreadInput(curTid, fgTid, false); } catch { }
+                }
+            }
+        }
+
         private void LaunchOrFocus(string procName, string exe, string title)
         {
             try
@@ -1700,11 +1843,36 @@ namespace OmegaStandaloneLab
                 for (int i = 0; i < ps.Length; i++)
                 {
                     IntPtr h = ps[i].MainWindowHandle;
-                    if (h != IntPtr.Zero) { if (IsIconic(h)) ShowWindow(h, 9); SetForegroundWindow(h); SetAct("Focused " + title + " (PID " + ps[i].Id + ")"); return; }
+                    if (h != IntPtr.Zero)
+                    {
+                        ForceWindowToForeground(h);
+                        SetAct("Focused " + title + " (PID " + ps[i].Id + ")");
+                        return;
+                    }
                 }
                 if (!File.Exists(exe)) { SetAct("Missing executable: " + exe); return; }
                 ProcessStartInfo psi = new ProcessStartInfo(exe); psi.WorkingDirectory = Path.GetDirectoryName(exe);
                 Process p = Process.Start(psi);
+                if (p != null)
+                {
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        for (int w = 0; w < 18; w++)
+                        {
+                            Thread.Sleep(90);
+                            try
+                            {
+                                p.Refresh();
+                                if (p.MainWindowHandle != IntPtr.Zero)
+                                {
+                                    ForceWindowToForeground(p.MainWindowHandle);
+                                    break;
+                                }
+                            }
+                            catch { break; }
+                        }
+                    });
+                }
                 SetAct("Launched " + title + (p != null ? (" (PID " + p.Id + ")") : ""));
                 RefreshAsync();
             }
@@ -1734,8 +1902,8 @@ namespace OmegaStandaloneLab
                         LaunchOrFocus("OmegaSteg", _sgExe, "OmegaSteg v0.2.1 (OmegaSec)");
                         LaunchOrFocus("OmegaConductor", _cdExe, "OmegaConductor v1.0.0 GM");
                         LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM");
-                        LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.2.0 GM");
-                        SetAct("Full 14-Station Suite v3.0.4 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
+                        LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.2.1 GM");
+                        SetAct("Full 14-Station Suite v3.0.5 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
                     });
                 }
                 catch { }
@@ -1775,7 +1943,7 @@ namespace OmegaStandaloneLab
             m.Items.Add("OmegaAV v0.7.5 Renders (1080p/4K MP4, AVI & PNGs)", null, delegate { OpenDir(Path.Combine(_avDir, "renders")); });
             m.Items.Add("OmegaSynth v1.1.1 Final GM Renders (48kHz Stereo .WAV)", null, delegate { OpenDir(Path.Combine(_syDir, "renders")); });
             m.Items.Add("OmegaTensor v1.0.2 GM Split-Inference Snapshots & Stress Logs", null, delegate { OpenDir(Path.Combine(_tnDir, "exports")); });
-            m.Items.Add("OmegaBraidRE v1.2.0 Recovered #[repr(C)] / C++23 / AOB Exports (:19794)", null, delegate { OpenDir(Path.Combine(_dlDir, "omega_braid_re_exports")); });
+            m.Items.Add("OmegaBraidRE v1.2.1 Recovered #[repr(C)] / C++23 / AOB Exports (:19794)", null, delegate { OpenDir(Path.Combine(_dlDir, "omega_braid_re_exports")); });
             m.Items.Add("OmegaSonar v1.1.0 GM Radar Snapshots & Stress Logs", null, delegate { OpenDir(Path.Combine(_snDir, "exports")); });
             m.Items.Add("OmegaPenrose v1.0.2 Final GM Exports (.STL, .OBJ, Citadel, .AVI, .SVG)", null, delegate { OpenDir(Path.Combine(_pnDir, "exports")); });
             m.Items.Add("OmegaPenrose v1.0.2 Final GM Patch Bank (.openrose)", null, delegate { OpenDir(Path.Combine(_pnDir, "patches")); });

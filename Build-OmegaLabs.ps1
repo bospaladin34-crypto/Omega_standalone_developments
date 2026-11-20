@@ -18,7 +18,7 @@ if (-not (Test-Path $Csc)) {
 }
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host " OMEGA UNIFIED LABS v3.0.4 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
+Write-Host " OMEGA UNIFIED LABS v3.0.5 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # Stop any running station binaries before recompiling in place
@@ -292,12 +292,12 @@ if ($CreateDesktopShortcut) {
     try {
         $DesktopDir = [Environment]::GetFolderPath("Desktop")
         $Wsh = New-Object -ComObject WScript.Shell
-        $Lnk = $Wsh.CreateShortcut((Join-Path $DesktopDir "Omega Standalone Labs v3.0.4.lnk"))
+        $Lnk = $Wsh.CreateShortcut((Join-Path $DesktopDir "Omega Standalone Labs v3.0.5.lnk"))
         $Lnk.TargetPath = $LauncherExe
         $Lnk.WorkingDirectory = $RepoRoot
         $Ico = Join-Path $IconsDir "omega_lab.ico"
         if (Test-Path $Ico) { $Lnk.IconLocation = $Ico }
-        $Lnk.Description = "Omega Unified Standalone & R&D Labs v3.0.4 (14 Stations)"
+        $Lnk.Description = "Omega Unified Standalone & R&D Labs v3.0.5 (14 Stations)"
         $Lnk.Save()
     } catch { }
 }
@@ -305,4 +305,4 @@ if ($CreateDesktopShortcut) {
 if (-not $SkipLaunch) {
     Start-Process -FilePath $LauncherExe -WorkingDirectory $RepoRoot
 }
-Write-Host ">>> [ALL PASS] Unified Suite v3.0.4 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green
+Write-Host ">>> [ALL PASS] Unified Suite v3.0.5 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green

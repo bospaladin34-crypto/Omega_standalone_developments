@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag to publish (e.g. v3.0.4)'
+        description: 'Release tag to publish (e.g. v3.0.5)'
         required: false
-        default: 'v3.0.4'
+        default: 'v3.0.5'
 
 permissions:
   contents: read
@@ -32,7 +32,7 @@ jobs:
         shell: pwsh
         run: |
           $Tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag_name }}" } else { "${{ github.ref_name }}" }
-          if ([string]::IsNullOrWhiteSpace($Tag)) { $Tag = "v3.0.4" }
+          if ([string]::IsNullOrWhiteSpace($Tag)) { $Tag = "v3.0.5" }
           $ShaShort = (& git rev-parse --short HEAD).Trim()
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Package-ReleaseBundle.ps1 -Version $Tag -BaselineCommit $ShaShort
           if ($LASTEXITCODE -ne 0) { throw "Package-ReleaseBundle.ps1 failed ($LASTEXITCODE)" }
