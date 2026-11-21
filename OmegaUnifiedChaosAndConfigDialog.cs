@@ -89,7 +89,7 @@ namespace OmegaStandaloneLab
                         }
 
                         string body = string.Format(CultureInfo.InvariantCulture,
-                            "{{\"ok\":true,\"service\":\"OmegaUnifiedLabDeck v3.0.9\",\"port\":19800,\"host\":\"{0}\",\"gpu\":\"{1}\",\"gpu_vram_mb\":{2},\"adb_devices\":{3},\"last_chaos\":\"{4}\"}}",
+                            "{{\"ok\":true,\"service\":\"OmegaUnifiedLabDeck v3.0.10\",\"port\":19800,\"host\":\"{0}\",\"gpu\":\"{1}\",\"gpu_vram_mb\":{2},\"adb_devices\":{3},\"last_chaos\":\"{4}\"}}",
                             Esc(prof.HostAlias), Esc(prof.PrimaryGpuName), prof.PrimaryGpuVramMb, prof.DetectedAdbDevices.Count, Esc(LastChaosSummary));
                         byte[] raw = Encoding.UTF8.GetBytes(body);
                         string hdr = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + raw.Length + "\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
@@ -121,7 +121,7 @@ namespace OmegaStandaloneLab
         public OmegaUnifiedChaosAndConfigDialog()
         {
             OmegaHardwareProfile p = OmegaHardwareConfig.LoadAndApplyEnvironment(true, true);
-            Text = "Omega Unified Lab v3.0.9 :: Hardware Profile (omega.config.json) & 8-Vector R&D Chaos Harness (:19800)";
+            Text = "Omega Unified Lab v3.0.10 :: Hardware Profile (omega.config.json) & 8-Vector R&D Chaos Harness (:19800)";
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(920, 660);
             BackColor = Color.FromArgb(10, 15, 28);

@@ -613,7 +613,7 @@ namespace OmegaStandaloneLab
 
         private void RunHostRtxCompanionAsync()
         {
-            string hostExe = Path.Combine(_suiteRoot, "11_omega_edge_workers\rust_p10_worker", "bin", "omega_p10_worker_host.exe");
+            string hostExe = Path.Combine(_suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "bin", "omega_p10_worker_host.exe");
             if (!File.Exists(hostExe))
             {
                 AppendLog("Host companion missing at " + hostExe + " — click '5. Wake / Deploy P10' to build!", Color.FromArgb(248, 113, 113));
@@ -642,7 +642,7 @@ namespace OmegaStandaloneLab
 
         private void WakeOrDeployPixelWorkerAsync()
         {
-            string ps1 = Path.Combine(_suiteRoot, "11_omega_edge_workers\rust_p10_worker", "Deploy-And-Run-Pixel10Worker.ps1");
+            string ps1 = Path.Combine(_suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "Deploy-And-Run-Pixel10Worker.ps1");
             if (!File.Exists(ps1)) { AppendLog("Missing " + ps1, Color.FromArgb(248, 113, 113)); return; }
             AppendLog("Deploying & starting omega_p10_worker v0.7.0 (:19788) via Deploy-And-Run-Pixel10Worker.ps1...", Color.FromArgb(56, 189, 248));
             ThreadPool.QueueUserWorkItem(delegate

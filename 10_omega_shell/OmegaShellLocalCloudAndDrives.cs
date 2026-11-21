@@ -545,7 +545,7 @@ namespace OmegaShellStudio
 
             if (sub == "host-bench" || sub == "host-tensor")
             {
-                string hostExe = Path.Combine(Directory.GetParent(shellRoot).FullName, "11_omega_edge_workers\rust_p10_worker", "bin", "omega_p10_worker_host.exe");
+                string hostExe = Path.Combine(Directory.GetParent(shellRoot).FullName, "11_omega_edge_workers\\rust_p10_worker", "bin", "omega_p10_worker_host.exe");
                 if (!File.Exists(hostExe)) return "Host worker binary not built yet: " + hostExe;
                 string hArgs = (sub == "host-tensor") ? "--vulkan tensor" : "--bench";
                 return Win32HardwareTuner.RunCmdFast(hostExe, hArgs, 25000);

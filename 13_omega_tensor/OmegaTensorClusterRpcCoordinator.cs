@@ -638,7 +638,7 @@ namespace OmegaTensorStudio
         public string CalibrateHostVulkanAndEdgeCluster(OmegaTensorDirectComputeGpu hostGpu)
         {
             TryAutoRecoverPixel10Daemon();
-            string hostBin = Path.Combine(_suiteRoot, "11_omega_edge_workers\rust_p10_worker", "bin", "omega_p10_worker_host.exe");
+            string hostBin = Path.Combine(_suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "bin", "omega_p10_worker_host.exe");
             if (File.Exists(hostBin))
             {
                 try

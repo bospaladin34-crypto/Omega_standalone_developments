@@ -298,7 +298,7 @@ namespace OmegaShellStudio
             CodeFormatterAndCompiler.RunProcessCapture(adb, "-s " + ser + " push \"" + okLocal + "\" /sdcard/ok.sh", null, 5000, out ec);
 
             string suiteRoot = Directory.GetParent(shellRoot.TrimEnd('\\', '/')).FullName;
-            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\rust_p10_worker", "src", "main.rs");
+            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "src", "main.rs");
             if (File.Exists(workerRs))
             {
                 CodeFormatterAndCompiler.RunProcessCapture(adb, "-s " + ser + " push \"" + workerRs + "\" /sdcard/Download/omega_p10_main.rs", null, 8000, out ec);
@@ -890,7 +890,7 @@ namespace OmegaShellStudio
             }
 
             string suiteRoot = Directory.GetParent(shellRoot.TrimEnd('\\', '/')).FullName;
-            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\rust_p10_worker", "src", "main.rs");
+            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "src", "main.rs");
             if (!File.Exists(workerRs))
                 return "[AVF Daemon Error] Missing canonical worker source: " + workerRs;
 
@@ -1026,7 +1026,7 @@ namespace OmegaShellStudio
             }
 
             string suiteRoot = Directory.GetParent(shellRoot.TrimEnd('\\', '/')).FullName;
-            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\rust_p10_worker", "src", "main.rs");
+            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "src", "main.rs");
             if (!File.Exists(workerRs))
                 return "[AVF Rust Error] Canonical source not found at: " + workerRs;
 

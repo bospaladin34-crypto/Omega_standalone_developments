@@ -597,7 +597,7 @@ namespace OmegaStandaloneLab
                 "     Embeds and self-heals Golay-protected shaders inside PNG art with 1-click\r\n" +
                 "     hot-loading into OmegaAV v0.7.1 (:19779) and Lean 4 Forge export.\r\n"));
             list.Add(new ManualChapter("15. Pixel 10 Zero-Root ARM64 Rust + Vulkan Compute Worker (:19788)",
-                "PIXEL 10 (TENSOR G5 + POWERVR DXT-48-1536) RUST + VULKAN WORKER (11_omega_edge_workers\rust_p10_worker)\r\n" +
+                "PIXEL 10 (TENSOR G5 + POWERVR DXT-48-1536) RUST + VULKAN WORKER (11_omega_edge_workers\\rust_p10_worker)\r\n" +
                 "=====================================================================================\r\n" +
                 "  1. Unprivileged Linux 6.12 sched_setaffinity (syscall 122) 3-Lane Partition:\r\n" +
                 "     - 0x03 (cpu0-1, 2x Cortex-A520 @ 2.246 GHz): 15.965 Hz (62.636 ms) Sensor/Clock\r\n" +

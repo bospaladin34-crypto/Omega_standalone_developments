@@ -199,7 +199,7 @@ namespace OmegaShellStudio
                     AddLabAppRow(rows, liveSocks, "OmegaShell v1.1.6 GM", "OmegaShell", 19781, Path.Combine(_suiteRoot, "10_omega_shell", "OmegaShell.exe"));
                     AddLabAppRow(rows, liveSocks, "OmegaConductor v1.0.0 GM (:19790)", "OmegaConductor", 19790, Path.Combine(_suiteRoot, "12_omega_conductor", "OmegaConductor.exe"));
                     AddLabAppRow(rows, liveSocks, "OmegaTensor v1.0.2 GM (:19791)", "OmegaTensor", 19791, Path.Combine(_suiteRoot, "13_omega_tensor", "OmegaTensor.exe"));
-                    AddLabAppRow(rows, liveSocks, "Pixel 10 10-Kernel Tensor", "adb", 19788, Path.Combine(_suiteRoot, "11_omega_edge_workers\rust_p10_worker", "Deploy-And-Run-Pixel10Worker.ps1"));
+                    AddLabAppRow(rows, liveSocks, "Pixel 10 10-Kernel Tensor", "adb", 19788, Path.Combine(_suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "Deploy-And-Run-Pixel10Worker.ps1"));
                     AddLabAppRow(rows, liveSocks, "AVF Virtio-GPU Worker (:19789)", "ssh/adb", 19789, "http://127.0.0.1:19789/api/health");
                     AddLabAppRow(rows, liveSocks, "Android AVF SSH (:22222)", "adb", 22222, "adb forward tcp:22222 tcp:2222");
                     AddLabAppRow(rows, liveSocks, "Sovereign Manifold UTCP", "sovereign", 8097, (Environment.GetEnvironmentVariable("OMEGA_EXTERNAL_PROJECT_DIR") ?? AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\')));

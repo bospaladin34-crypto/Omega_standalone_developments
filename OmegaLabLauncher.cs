@@ -93,7 +93,7 @@ namespace OmegaStandaloneLab
             _sgDir = Path.Combine(root, "08_omega_steg");
             _fgDir = Path.Combine(root, "09_omega_forge");
             _shDir = Path.Combine(root, "10_omega_shell");
-            _p10Dir = Path.Combine(root, "11_omega_edge_workers\rust_p10_worker");
+            _p10Dir = Path.Combine(root, "11_omega_edge_workers\\rust_p10_worker");
             _cdDir = Path.Combine(root, "12_omega_conductor");
             _tnDir = Path.Combine(root, "13_omega_tensor");
             _reDir = Path.Combine(root, "14_omega_braid_re");
@@ -115,7 +115,7 @@ namespace OmegaStandaloneLab
             Directory.CreateDirectory(_dlDir);
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.9 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
+            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.10 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
             Rectangle wa = Screen.PrimaryScreen != null ? Screen.PrimaryScreen.WorkingArea : new Rectangle(0, 0, 1920, 1080);
             int fitH = Math.Min(924, Math.Max(680, wa.Height - 38));
             ClientSize = new Size(1124, fitH);
@@ -131,7 +131,7 @@ namespace OmegaStandaloneLab
 
             Label sub = new Label();
             sub.UseMnemonic = false;
-            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.9 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.4.0 (:19794) [Shift+F7]";
+            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.10 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.4.0 (:19794) [Shift+F7]";
             sub.SetBounds(18, 8, 1088, 18);
             sub.ForeColor = C(56, 189, 248);
             sub.Font = new Font("Segoe UI Semibold", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -555,7 +555,7 @@ namespace OmegaStandaloneLab
             _lAct.ForeColor = C(52, 211, 153);
             _lAct.TextAlign = ContentAlignment.MiddleLeft;
             _lAct.Padding = new Padding(14, 0, 0, 0);
-            _lAct.Text = "Launcher v3.0.9 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
+            _lAct.Text = "Launcher v3.0.10 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
             bot.Controls.Add(_lAct);
 
             Controls.AddRange(new Control[]
@@ -582,7 +582,7 @@ namespace OmegaStandaloneLab
                 try
                 {
                     _trayIcon = new NotifyIcon();
-                    _trayIcon.Text = "Omega Unified Lab v3.0.9 (14 Stations)";
+                    _trayIcon.Text = "Omega Unified Lab v3.0.10 (14 Stations)";
                     Icon trayIc = null;
                     try { trayIc = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
                     _trayIcon.Icon = (trayIc != null) ? trayIc : SystemIcons.Application;
@@ -1042,7 +1042,7 @@ namespace OmegaStandaloneLab
                 _globalCtrlShiftF7Armed = RegisterHotKey(Handle, HK_CTRL_SHIFT_F7_BRAIDRE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.F7);
                 if (_lAct != null)
                 {
-                    _lAct.Text = "Launcher v3.0.9 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
+                    _lAct.Text = "Launcher v3.0.10 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
                         " -> OmegaBraidRE v1.4.0 (:19794) | F1..F4 | F7=Shell | F12=Stop";
                 }
             }
@@ -1533,7 +1533,7 @@ namespace OmegaStandaloneLab
             Directory.CreateDirectory(sshDir);
             string privKey = Path.Combine(sshDir, "id_ed25519_omega");
             string pubPath = privKey + ".pub";
-            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\rust_p10_worker", "src", "main.rs");
+            string workerRs = Path.Combine(suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "src", "main.rs");
 
             if (!File.Exists(privKey) || !File.Exists(pubPath))
             {
@@ -2027,7 +2027,7 @@ namespace OmegaStandaloneLab
                         LaunchOrFocus("OmegaConductor", _cdExe, "OmegaConductor v1.0.0 GM");
                         LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM");
                         LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.4.0 GM");
-                        SetAct("Full 14-Station Suite v3.0.9 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
+                        SetAct("Full 14-Station Suite v3.0.10 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
                     });
                 }
                 catch { }
@@ -2059,7 +2059,7 @@ namespace OmegaStandaloneLab
             m.Items.Add("Unified Hardware Config & R&D Chaos Harness (:19800)", null, delegate { using (OmegaUnifiedChaosAndConfigDialog dlg = new OmegaUnifiedChaosAndConfigDialog()) dlg.ShowDialog(this); });
             m.Items.Add("Vault Downloads (Papers, Audio, Shaders, Models)", null, delegate { OpenDir(_dlDir); });
             m.Items.Add("Pixel 10 10-Kernel Tensor Cockpit (:19788 Live Inspector)", null, delegate { OmegaLabPixel10CockpitDialog.ShowOrFocus(this, _root); });
-            m.Items.Add("Pixel 10 Rust+Vulkan Worker Dir (11_omega_edge_workers\rust_p10_worker)", null, delegate { OpenDir(_p10Dir); });
+            m.Items.Add("Pixel 10 Rust+Vulkan Worker Dir (11_omega_edge_workers\\rust_p10_worker)", null, delegate { OpenDir(_p10Dir); });
             m.Items.Add("OmegaShell v1.1.6 GM Cloud CAS Vault", null, delegate { OpenDir(Path.Combine(_shDir, "cloud_cas")); });
             m.Items.Add("OmegaShell v1.1.6 GM Workspace Builds (Gemma Codegen)", null, delegate { OpenDir(Path.Combine(_shDir, "workspace_builds")); });
             m.Items.Add("OmegaForge v0.2.1 Workspace (Compiled Binaries & Lean 4 Proofs)", null, delegate { OpenDir(Path.Combine(_fgDir, "workspace")); });
@@ -2196,11 +2196,11 @@ namespace OmegaStandaloneLab
                 CopyAll(shD, Path.Combine(dst, "10_omega_shell"), new string[] { "*.cs", "*.exe" });
                 CopyAll(tnD, Path.Combine(dst, "13_omega_tensor"), new string[] { "*.cs", "*.exe" });
                 CopyAll(Path.Combine(root, "14_omega_braid_re"), Path.Combine(dst, "14_omega_braid_re"), new string[] { "*.cs", "*.exe" });
-                string p10D = Path.Combine(root, "11_omega_edge_workers\rust_p10_worker");
-                CopyAll(p10D, Path.Combine(dst, "11_omega_edge_workers\rust_p10_worker"), new string[] { "*.toml", "*.ps1" });
-                CopyAll(Path.Combine(p10D, "src"), Path.Combine(dst, "11_omega_edge_workers\rust_p10_worker", "src"), new string[] { "*.rs" });
-                CopyAll(Path.Combine(p10D, "shaders"), Path.Combine(dst, "11_omega_edge_workers\rust_p10_worker", "shaders"), new string[] { "*.hlsl" });
-                CopyAll(Path.Combine(p10D, "bin"), Path.Combine(dst, "11_omega_edge_workers\rust_p10_worker", "bin"), new string[] { "*" });
+                string p10D = Path.Combine(root, "11_omega_edge_workers\\rust_p10_worker");
+                CopyAll(p10D, Path.Combine(dst, "11_omega_edge_workers\\rust_p10_worker"), new string[] { "*.toml", "*.ps1" });
+                CopyAll(Path.Combine(p10D, "src"), Path.Combine(dst, "11_omega_edge_workers\\rust_p10_worker", "src"), new string[] { "*.rs" });
+                CopyAll(Path.Combine(p10D, "shaders"), Path.Combine(dst, "11_omega_edge_workers\\rust_p10_worker", "shaders"), new string[] { "*.hlsl" });
+                CopyAll(Path.Combine(p10D, "bin"), Path.Combine(dst, "11_omega_edge_workers\\rust_p10_worker", "bin"), new string[] { "*" });
                 CopyAll(Path.Combine(shD, "config"), Path.Combine(dst, "10_omega_shell", "config"), new string[] { "*.oshrc", "*.tsv" });
                 CopyAll(Path.Combine(shD, "config", "ssh"), Path.Combine(dst, "10_omega_shell", "config", "ssh"), new string[] { "*.pub", "*.sh" });
                 CopyAll(Path.Combine(avD, "shaders"), Path.Combine(dst, "03_omega_av", "shaders"), new string[] { "*.omsh" });
