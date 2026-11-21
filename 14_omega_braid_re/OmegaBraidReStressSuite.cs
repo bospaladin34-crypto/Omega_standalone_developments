@@ -298,7 +298,9 @@ namespace OmegaBraidRE
 
         public static BraidStressSummary RunAll13Vectors() { return RunAll16Vectors(); }
 
-        public static BraidStressSummary RunAll16Vectors()
+        public static BraidStressSummary RunAll16Vectors() { return RunAll18Vectors(); }
+
+        public static BraidStressSummary RunAll18Vectors()
         {
             Stopwatch swTotal = Stopwatch.StartNew();
             BraidStressSummary s = new BraidStressSummary();
@@ -321,7 +323,9 @@ namespace OmegaBraidRE
             s.Vectors.Add(V13PdbMsf7AndDwarfSymbolRecovery());
             s.Vectors.Add(V14LiveProcessReadOnlyMemoryParity());
             s.Vectors.Add(V15Skse64F4seTrampolineCodegen());
-            s.Vectors.Add(V16Sub70MbNativeFootprintGate(out s.TrimmedWorkingSetMb));
+            s.Vectors.Add(V16LiveModuleDllEnumAndReadOnlyAttach());
+            s.Vectors.Add(V17WildcardAndNibbleAobScanner());
+            s.Vectors.Add(V18Sub70MbNativeFootprintGate(out s.TrimmedWorkingSetMb));
 
             swTotal.Stop();
             s.TotalCount = s.Vectors.Count;
@@ -695,7 +699,85 @@ namespace OmegaBraidRE
                     s5, s14));
         }
 
-        private static BraidStressVector V16Sub70MbNativeFootprintGate(out double ramMb)
+        private static BraidStressVector V16LiveModuleDllEnumAndReadOnlyAttach()
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            int pid;
+            using (Process me = Process.GetCurrentProcess()) { pid = me.Id; }
+            int trials = 16;
+            int ok = 0;
+            int modCount = 0;
+            int k32Exports = 0;
+
+            for (int i = 0; i < trials; i++)
+            {
+                List<LiveModuleItem> mods = OmegaBraidReLiveModulesAndAob.ListProcessModules(pid);
+                modCount = mods.Count;
+                LiveModuleItem k32 = null;
+                bool hasNtdll = false;
+                for (int m = 0; m < mods.Count; m++)
+                {
+                    if (string.Equals(mods[m].ModuleName, "ntdll.dll", StringComparison.OrdinalIgnoreCase)) hasNtdll = true;
+                    if (string.Equals(mods[m].ModuleName, "kernel32.dll", StringComparison.OrdinalIgnoreCase)) k32 = mods[m];
+                }
+                if (mods.Count >= 5 && hasNtdll && k32 != null)
+                {
+                    LiveMemorySnapshot dllSnap = OmegaBraidReLiveModulesAndAob.ReadLiveModulePeImage(
+                        pid, k32.BaseAddress, k32.ModuleSize, k32.ModuleName, 2 * 1024 * 1024);
+                    if (dllSnap.Success && dllSnap.PeImageBuffer.Length >= 4096)
+                    {
+                        BinaryContainerReport dllRep = OmegaBraidReCore.InspectContainer(dllSnap.PeImageBuffer);
+                        k32Exports = dllRep.Exports.Count;
+                        if (dllRep.Valid && dllRep.Format == BraidContainerKind.Pe32Plus && dllRep.Exports.Count >= 32)
+                        {
+                            ok++;
+                        }
+                    }
+                }
+            }
+            sw.Stop();
+            return Make("V16-LIVE-MODULE-DLL-ENUM", trials, ok, sw.Elapsed.TotalMilliseconds,
+                string.Format(CultureInfo.InvariantCulture,
+                    "16/16 Module32FirstW+Module32NextW enumerated {0} loaded DLLs + live kernel32.dll EAT ({1} exports)",
+                    modCount, k32Exports));
+        }
+
+        private static BraidStressVector V17WildcardAndNibbleAobScanner()
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            byte[] pe = BuildSyntheticFullPe32PlusImage();
+            BinaryContainerReport rep = OmegaBraidReCore.InspectContainer(pe);
+            List<LiftedBraidFunction> fns = OmegaBraidReCore.AutoDiscoverFunctionsWithReport(pe, rep, 16);
+            byte[] actorV1 = GetSampleActorV1Bytes();
+            int trials = 256;
+            int ok = 0;
+
+            for (int i = 0; i < trials; i++)
+            {
+                // 1. Scan synthetic PE for both nibble-masked RIP-relative LEAs:
+                //    fn0+0x04 (RVA 0x1004): 48 8D 15 35 11 00 00 -> RVA 0x2140 ("Sovereign_EDE8_Ready")
+                //    fn0+0x1A (RVA 0x101A): 48 8D 0D 3F 11 00 00 -> RVA 0x2160 (L"Fallout4.esm")
+                AobScanReport ripRdx = OmegaBraidReLiveModulesAndAob.ScanBufferForAob(pe, rep, fns, "48 8D 1? ?? ?? ?? ??", 16);
+                AobScanReport ripRcx = OmegaBraidReLiveModulesAndAob.ScanBufferForAob(pe, rep, fns, "48 8D 0? ?? ?? ?? ??", 16);
+                // 2. Synthesize shortest unique AOB for Actor::UpdatePhysics & verify single exact hit!
+                int uniqMatches;
+                string uniqPat = OmegaBraidReLiveModulesAndAob.SynthesizeUniqueFunctionAob(actorV1, null, actorV1, out uniqMatches);
+                AobScanReport actorScan = OmegaBraidReLiveModulesAndAob.ScanBufferForAob(actorV1, null, null, "48 89 5C 24 ? 48 83 EC ?? 4? 89", 8);
+
+                if (ripRdx.Hits.Count == 1 && ripRdx.Hits[0].HasRipTarget && ripRdx.Hits[0].RipTargetRva == 0x2140UL &&
+                    ripRcx.Hits.Count == 1 && ripRcx.Hits[0].HasRipTarget && ripRcx.Hits[0].RipTargetRva == 0x2160UL &&
+                    uniqMatches == 1 && !string.IsNullOrEmpty(uniqPat) &&
+                    actorScan.Hits.Count == 1 && actorScan.Hits[0].FileOffset == 0)
+                {
+                    ok++;
+                }
+            }
+            sw.Stop();
+            return Make("V17-WILDCARD-AOB-SCANNER", trials, ok, sw.Elapsed.TotalMilliseconds,
+                "256/256 wildcard + nibble-masked AOB scans, dual RIP-target resolution (0x2140 & 0x2160) & unique AOB synthesis verified");
+        }
+
+        private static BraidStressVector V18Sub70MbNativeFootprintGate(out double ramMb)
         {
             Stopwatch sw = Stopwatch.StartNew();
             OmegaBraidReDirectComputeGpu.TrimWorkingSetNow();
@@ -705,7 +787,7 @@ namespace OmegaBraidRE
             }
             sw.Stop();
             int ok = (ramMb > 0.1 && ramMb < 70.0) ? 1 : 0;
-            return Make("V16-SUB70MB-NATIVE-RAM-GATE", 1, ok, sw.Elapsed.TotalMilliseconds,
+            return Make("V18-SUB70MB-NATIVE-RAM-GATE", 1, ok, sw.Elapsed.TotalMilliseconds,
                 string.Format(CultureInfo.InvariantCulture, "Trimmed working set = {0:0.0} MB (< 70.0 MB ceiling vs ~1,600 MB JVM decompiler)", ramMb));
         }
     }

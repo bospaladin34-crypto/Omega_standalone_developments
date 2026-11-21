@@ -842,6 +842,46 @@ pub fn compute_x64_safe_steal_len(code: &[u8], min_bytes: usize) -> usize {
     if off > code.len() { code.len() } else { off }
 }
 
+
+pub fn scan_masked_aob_first(haystack: &[u8], vals: &[u8], masks: &[u8]) -> Option<usize> {
+    if vals.is_empty() || vals.len() != masks.len() || haystack.len() < vals.len() {
+        return None;
+    }
+    let end = haystack.len() - vals.len();
+    let mut pos = 0usize;
+    while pos <= end {
+        let mut ok = true;
+        let mut k = 0usize;
+        while k < vals.len() {
+            if (haystack[pos + k] & masks[k]) != (vals[k] & masks[k]) {
+                ok = false;
+                break;
+            }
+            k += 1;
+        }
+        if ok {
+            return Some(pos);
+        }
+        pos += 1;
+    }
+    None
+}
+
+pub fn resolve_x64_rip_target_rva(insn_rva: u64, insn_bytes: &[u8]) -> Option<u64> {
+    if insn_bytes.len() >= 5 && (insn_bytes[0] == 0xE8 || insn_bytes[0] == 0xE9) {
+        let disp = i32::from_le_bytes([insn_bytes[1], insn_bytes[2], insn_bytes[3], insn_bytes[4]]) as i64;
+        return Some(((insn_rva as i64) + 5 + disp) as u64);
+    }
+    if insn_bytes.len() >= 7 && insn_bytes[0] >= 0x40 && insn_bytes[0] <= 0x4F
+        && (insn_bytes[1] == 0x8D || insn_bytes[1] == 0x8B || insn_bytes[1] == 0x89)
+        && (insn_bytes[2] & 0xC7) == 0x05
+    {
+        let disp = i32::from_le_bytes([insn_bytes[3], insn_bytes[4], insn_bytes[5], insn_bytes[6]]) as i64;
+        return Some(((insn_rva as i64) + 7 + disp) as u64);
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1037,5 +1077,21 @@ mod tests {
         ];
         assert_eq!(compute_x64_safe_steal_len(&prologue, 5), 5);
         assert_eq!(compute_x64_safe_steal_len(&prologue, 14), 15);
+    }
+
+    #[test]
+    fn test_wildcard_and_nibble_masked_aob_scanner() {
+        let buf = [0x90u8, 0x90, 0x48, 0x89, 0x5C, 0x24, 0x18, 0x48, 0x83, 0xEC, 0x20, 0x49, 0x89, 0xCE];
+        // Match "48 89 5C 24 ?? 48 83 EC 20 4? 89" at offset 2
+        let vals  = [0x48u8, 0x89, 0x5C, 0x24, 0x00, 0x48, 0x83, 0xEC, 0x20, 0x40, 0x89];
+        let masks = [0xFFu8, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xF0, 0xFF];
+        assert_eq!(scan_masked_aob_first(&buf, &vals, &masks), Some(2));
+    }
+
+    #[test]
+    fn test_rip_relative_target_rva_resolver() {
+        // 48 8D 0D 39 11 00 00 @ RVA 0x1000 -> next=0x1007 + 0x1139 = 0x2140
+        let lea_rip = [0x48u8, 0x8D, 0x0D, 0x39, 0x11, 0x00, 0x00];
+        assert_eq!(resolve_x64_rip_target_rva(0x1000, &lea_rip), Some(0x2140));
     }
 }

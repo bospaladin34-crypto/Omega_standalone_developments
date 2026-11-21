@@ -1,5 +1,5 @@
 /*
- * omega_braid_re_cli.c — OmegaBraidRE v1.3.0 Universal Zero-Dependency C11 Engine & CLI
+ * omega_braid_re_cli.c — OmegaBraidRE v1.4.0 Universal Zero-Dependency C11 Engine & CLI
  * Clean-room PE32+/PE32/ELF64 inspector with:
  *   1. Multi-section RVA -> FileOffset mapper + x64 .pdata RUNTIME_FUNCTION & UNWIND_INFO bounds
  *   2. PE Export (EAT) & Import (IAT) + FF 15 [RIP+disp32] + E8->FF 25 Thunk symbol resolution
@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
 #define BRAID_MAX_INSNS       256
 #define BRAID_MAX_BLOCKS       64
@@ -641,6 +642,20 @@ static size_t compute_x64_steal_c(const uint8_t* code, size_t len, size_t min_by
         if (off == start) break;
     }
     return (off > len) ? len : off;
+}
+
+
+static ptrdiff_t scan_masked_aob_c(const uint8_t* buf, size_t len, const uint8_t* vals, const uint8_t* masks, size_t plen) {
+    if (!buf || !vals || !masks || plen == 0 || len < plen) return -1;
+    size_t limit = len - plen;
+    for (size_t i = 0; i <= limit; i++) {
+        bool ok = true;
+        for (size_t k = 0; k < plen; k++) {
+            if ((buf[i + k] & masks[k]) != (vals[k] & masks[k])) { ok = false; break; }
+        }
+        if (ok) return (ptrdiff_t)i;
+    }
+    return -1;
 }
 
 static BinaryHeaderSummary inspect_binary_container(const uint8_t *buf, size_t len) {
@@ -1542,7 +1557,7 @@ static size_t emit_recovered_polyglot_headers(const LiftedFunction *fn, const ch
 
     size_t n = 0;
     n += (size_t)snprintf(out_buf + n, cap - n,
-        "// Auto-Synthesized by OmegaBraidRE v1.3.0 | Sheaf H^1 = %u (%s)\n"
+        "// Auto-Synthesized by OmegaBraidRE v1.4.0 | Sheaf H^1 = %u (%s)\n"
         "#[repr(C)]\npub struct %s {\n",
         fn->h1_defect_count,
         (fn->h1_defect_count == 0) ? "EXACT_ZERO_CONFLICT" : "UNION_OVERLAP_DETECTED",
@@ -1981,8 +1996,27 @@ static int run_stress_suite(void) {
     printf("[%s] V16-SKSE64-F4SE-TRAMPOLINE  -> 5B-boundary=%zuB | 14B-boundary=%zuB (zero mid-opcode split)\n",
            v16 ? "PASS" : "FAIL", st5, st14);
 
-    printf("\n=== OMEGABRAIDRE v1.3.0 C11 ENGINE AUDIT: %d/16 VECTORS PASSED ===\n", passed);
-    return (passed == 16) ? 0 : 1;
+    /* V17: Wildcard & Nibble-Masked AOB Signature Scanner */
+    const uint8_t aob_hay[16] = { 0x90, 0x90, 0x48, 0x89, 0x5C, 0x24, 0x18, 0x48, 0x83, 0xEC, 0x20, 0x49, 0x89, 0xCE, 0x90, 0xC3 };
+    const uint8_t aob_val[11] = { 0x48, 0x89, 0x5C, 0x24, 0x00, 0x48, 0x83, 0xEC, 0x20, 0x40, 0x89 };
+    const uint8_t aob_msk[11] = { 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xF0, 0xFF };
+    ptrdiff_t aob_hit = scan_masked_aob_c(aob_hay, sizeof(aob_hay), aob_val, aob_msk, 11);
+    bool v17 = (aob_hit == 2);
+    if (v17) passed++;
+    printf("[%s] V17-WILDCARD-NIBBLE-AOB     -> Matched '48 89 5C 24 ?? 48 83 EC 20 4? 89' at +0x%02zX\n",
+           v17 ? "PASS" : "FAIL", (size_t)aob_hit);
+
+    /* V18: RIP-Relative AOB Target RVA Resolution */
+    const uint8_t lea_insn[7] = { 0x48, 0x8D, 0x0D, 0x39, 0x11, 0x00, 0x00 };
+    int32_t lea_disp = (int32_t)rd_u32_le(lea_insn + 3);
+    uint64_t rip_target = (uint64_t)((int64_t)0x1000 + 7 + (int64_t)lea_disp);
+    bool v18 = (rip_target == 0x2140ULL);
+    if (v18) passed++;
+    printf("[%s] V18-AOB-RIP-TARGET-RESOLVE  -> LEA [RIP+0x1139] @ 0x1000 -> RVA 0x%llX\n",
+           v18 ? "PASS" : "FAIL", (unsigned long long)rip_target);
+
+    printf("\n=== OMEGABRAIDRE v1.4.0 C11 ENGINE AUDIT: %d/18 VECTORS PASSED ===\n", passed);
+    return (passed == 18) ? 0 : 1;
 }
 
 int main(int argc, char **argv) {
@@ -1998,7 +2032,7 @@ int main(int argc, char **argv) {
         size_t rd = fread(buf, 1, (size_t)sz, fp);
         fclose(fp);
         BinaryHeaderSummary hs = inspect_binary_container(buf, rd);
-        printf("OmegaBraidRE v1.3.0 Inspect: Format=%d ISA=%d Valid=%d ImageBase=0x%llX .text=0x%llX .pdata=%u Exports=%u Imports=%u CLR=%d(%s)\n",
+        printf("OmegaBraidRE v1.4.0 Inspect: Format=%d ISA=%d Valid=%d ImageBase=0x%llX .text=0x%llX .pdata=%u Exports=%u Imports=%u CLR=%d(%s)\n",
                hs.format, hs.isa, hs.valid ? 1 : 0,
                (unsigned long long)hs.image_base,
                (unsigned long long)hs.text_rva,

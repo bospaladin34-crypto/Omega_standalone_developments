@@ -18,7 +18,7 @@ if (-not (Test-Path $Csc)) {
 }
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host " OMEGA UNIFIED LABS v3.0.6 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
+Write-Host " OMEGA UNIFIED LABS v3.0.7 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # Stop any running station binaries before recompiling in place
@@ -46,6 +46,7 @@ function Invoke-StationBuild {
     )
     $argsList = New-Object "System.Collections.Generic.List[string]"
     $argsList.Add("/nologo")
+    $argsList.Add("/codepage:65001")
     $argsList.Add("/optimize+")
     $argsList.Add("/platform:x64")
     $argsList.Add("/target:winexe")
@@ -206,7 +207,7 @@ if (-not $SkipRust) {
     if ($CargoCmd) {
         $RustSuites = @(
             @("00_core_rust_audit", (Join-Path $RepoRoot "00_core_rust_audit"), "10/10"),
-            @("omega_braid_re_core", (Join-Path $ReDir "rust_braid_re_core"), "7/7")
+            @("omega_braid_re_core", (Join-Path $ReDir "rust_braid_re_core"), "9/9")
         )
         foreach ($rs in $RustSuites) {
             if (Test-Path $rs[1]) {
@@ -292,12 +293,12 @@ if ($CreateDesktopShortcut) {
     try {
         $DesktopDir = [Environment]::GetFolderPath("Desktop")
         $Wsh = New-Object -ComObject WScript.Shell
-        $Lnk = $Wsh.CreateShortcut((Join-Path $DesktopDir "Omega Standalone Labs v3.0.6.lnk"))
+        $Lnk = $Wsh.CreateShortcut((Join-Path $DesktopDir "Omega Standalone Labs v3.0.7.lnk"))
         $Lnk.TargetPath = $LauncherExe
         $Lnk.WorkingDirectory = $RepoRoot
         $Ico = Join-Path $IconsDir "omega_lab.ico"
         if (Test-Path $Ico) { $Lnk.IconLocation = $Ico }
-        $Lnk.Description = "Omega Unified Standalone & R&D Labs v3.0.6 (14 Stations)"
+        $Lnk.Description = "Omega Unified Standalone & R&D Labs v3.0.7 (14 Stations)"
         $Lnk.Save()
     } catch { }
 }
@@ -305,4 +306,4 @@ if ($CreateDesktopShortcut) {
 if (-not $SkipLaunch) {
     Start-Process -FilePath $LauncherExe -WorkingDirectory $RepoRoot
 }
-Write-Host ">>> [ALL PASS] Unified Suite v3.0.6 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green
+Write-Host ">>> [ALL PASS] Unified Suite v3.0.7 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green

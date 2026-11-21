@@ -114,7 +114,7 @@ namespace OmegaStandaloneLab
             Directory.CreateDirectory(_dlDir);
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.6 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
+            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.7 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
             ClientSize = new Size(1124, 924);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -127,7 +127,7 @@ namespace OmegaStandaloneLab
 
             Label sub = new Label();
             sub.UseMnemonic = false;
-            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.6 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.3.0 (:19794) [Shift+F7]";
+            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.7 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.4.0 (:19794) [Shift+F7]";
             sub.SetBounds(18, 8, 1088, 18);
             sub.ForeColor = C(56, 189, 248);
             sub.Font = new Font("Segoe UI Semibold", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -282,10 +282,10 @@ namespace OmegaStandaloneLab
             bTnX.Height = 28;
             bTnX.Click += delegate { StopApps(new string[] { "OmegaTensor" }); };
 
-            Button bRe = Btn("Launch / Focus OmegaBraidRE v1.3.0 (:19794) [Shift+F7]", 18, 578, 348, C(14, 116, 144));
+            Button bRe = Btn("Launch / Focus OmegaBraidRE v1.4.0 (:19794) [Shift+F7]", 18, 578, 348, C(14, 116, 144));
             bRe.Height = 28;
             bRe.FlatAppearance.BorderColor = C(52, 211, 153);
-            bRe.Click += delegate { LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.3.0 (#~ CIL + .pdata + E8)"); };
+            bRe.Click += delegate { LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.4.0 (#~ CIL + .pdata + E8)"); };
             Button bReB = Btn("RE Exports Folder", 374, 578, 176, C(30, 58, 138));
             bReB.Height = 28;
             bReB.Click += delegate { OpenDir(Path.Combine(_dlDir, "omega_braid_re_exports")); };
@@ -546,7 +546,7 @@ namespace OmegaStandaloneLab
             _lAct.ForeColor = C(52, 211, 153);
             _lAct.TextAlign = ContentAlignment.MiddleLeft;
             _lAct.Padding = new Padding(14, 0, 0, 0);
-            _lAct.Text = "Launcher v3.0.6 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
+            _lAct.Text = "Launcher v3.0.7 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
             bot.Controls.Add(_lAct);
 
             Controls.AddRange(new Control[]
@@ -1008,8 +1008,8 @@ namespace OmegaStandaloneLab
                 _globalCtrlShiftF7Armed = RegisterHotKey(Handle, HK_CTRL_SHIFT_F7_BRAIDRE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.F7);
                 if (_lAct != null)
                 {
-                    _lAct.Text = "Launcher v3.0.6 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
-                        " -> OmegaBraidRE v1.3.0 (:19794) | F1..F4 | F7=Shell | F12=Stop";
+                    _lAct.Text = "Launcher v3.0.7 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
+                        " -> OmegaBraidRE v1.4.0 (:19794) | F1..F4 | F7=Shell | F12=Stop";
                 }
             }
             catch { }
@@ -1075,11 +1075,11 @@ namespace OmegaStandaloneLab
                             return;
                         }
                         ForceWindowToForeground(h);
-                        SetAct("[Shift+F7] Focused OmegaBraidRE v1.3.0 (:19794, PID " + ps[i].Id + ")");
+                        SetAct("[Shift+F7] Focused OmegaBraidRE v1.4.0 (:19794, PID " + ps[i].Id + ")");
                         return;
                     }
                 }
-                LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.3.0 GM");
+                LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.4.0 GM");
             }
             catch (Exception ex)
             {
@@ -1902,8 +1902,8 @@ namespace OmegaStandaloneLab
                         LaunchOrFocus("OmegaSteg", _sgExe, "OmegaSteg v0.2.1 (OmegaSec)");
                         LaunchOrFocus("OmegaConductor", _cdExe, "OmegaConductor v1.0.0 GM");
                         LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM");
-                        LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.3.0 GM");
-                        SetAct("Full 14-Station Suite v3.0.6 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
+                        LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.4.0 GM");
+                        SetAct("Full 14-Station Suite v3.0.7 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
                     });
                 }
                 catch { }
@@ -1943,7 +1943,7 @@ namespace OmegaStandaloneLab
             m.Items.Add("OmegaAV v0.7.5 Renders (1080p/4K MP4, AVI & PNGs)", null, delegate { OpenDir(Path.Combine(_avDir, "renders")); });
             m.Items.Add("OmegaSynth v1.1.1 Final GM Renders (48kHz Stereo .WAV)", null, delegate { OpenDir(Path.Combine(_syDir, "renders")); });
             m.Items.Add("OmegaTensor v1.0.2 GM Split-Inference Snapshots & Stress Logs", null, delegate { OpenDir(Path.Combine(_tnDir, "exports")); });
-            m.Items.Add("OmegaBraidRE v1.3.0 Recovered #[repr(C)] / C++23 / AOB Exports (:19794)", null, delegate { OpenDir(Path.Combine(_dlDir, "omega_braid_re_exports")); });
+            m.Items.Add("OmegaBraidRE v1.4.0 Recovered #[repr(C)] / C++23 / AOB Exports (:19794)", null, delegate { OpenDir(Path.Combine(_dlDir, "omega_braid_re_exports")); });
             m.Items.Add("OmegaSonar v1.1.0 GM Radar Snapshots & Stress Logs", null, delegate { OpenDir(Path.Combine(_snDir, "exports")); });
             m.Items.Add("OmegaPenrose v1.0.2 Final GM Exports (.STL, .OBJ, Citadel, .AVI, .SVG)", null, delegate { OpenDir(Path.Combine(_pnDir, "exports")); });
             m.Items.Add("OmegaPenrose v1.0.2 Final GM Patch Bank (.openrose)", null, delegate { OpenDir(Path.Combine(_pnDir, "patches")); });

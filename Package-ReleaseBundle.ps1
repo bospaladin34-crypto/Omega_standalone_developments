@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v3.0.6",
+    [string]$Version = "v3.0.7",
     [string]$BaselineCommit = "",
     [switch]$SkipRebuild
 )
@@ -9,7 +9,7 @@ if ([string]::IsNullOrWhiteSpace($BaselineCommit)) {
     try {
         $BaselineCommit = (& git -C $RepoRoot rev-parse --short HEAD 2>$null | Out-String).Trim()
     } catch { }
-    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.6" }
+    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.7" }
 }
 
 $DistDir  = Join-Path $RepoRoot "dist"
@@ -114,7 +114,7 @@ if (Test-Path (Join-Path $StageDir "config\omega.config.json")) {
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory($StageDir, $ZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $true)
+[System.IO.Compression.ZipFile]::CreateFromDirectory($StageDir, $ZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 
 $SumLines = New-Object "System.Collections.Generic.List[string]"
 $ZipHash = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -137,13 +137,13 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($SumsPath, (($SumLines -join [string][char]10) + [string][char]10), $Utf8NoBom)
 
 $NotesLines = @(
-    "## Unified Omega Standalone & R&D Labs $Version GM (Windows x64 — 14 Stations)",
+    "## Unified Omega Standalone & R&D Labs $Version GM (Windows x64 -- 14 Stations)",
     "",
     "**Verified Source Baseline:** '$BaselineCommit' on 'vesper_production'",
-    "**Architecture:** Zero-NuGet Windows C# 5.0 ('csc.exe' x64) + Zero-Crate '#![no_std]' Rust ('17/17' invariant tests across 2 crates) + DirectCompute 'cs_5_0' + Universal C11 Edge & RE Engines",
+    "**Architecture:** Zero-NuGet Windows C# 5.0 ('csc.exe' x64) + Zero-Crate '#![no_std]' Rust ('19/19' invariant tests across 2 crates) + DirectCompute 'cs_5_0' + Universal C11 Edge & RE Engines",
     "",
     "### What's New in $Version",
-    "- **Station 14 — OmegaBraidRE v1.3.0 (':19794'):** Clean-room PE32+/PE32/ELF64 inspector, exact '.pdata' 'RUNTIME_FUNCTION' unwind bounds, 'IAT'/'EAT' + 'FF 25' thunk resolver, 'RIP'-relative ASCII/UTF-16LE strings, ECMA-335 '#~' 'TypeDef'/'MethodDef' CIL lifter, 240-root Conway-Sloane 'E8' cross-patch function differ, Cellular Sheaf 'H^1 = 0' Rust/C++23/C# struct synthesizer, and post-'D3DCompile' working-set trim ('3.1 MB' CLI / '1.3 MB' trimmed GUI).",
+    "- **Station 14 -- OmegaBraidRE v1.4.0 (':19794'):** Clean-room PE32+/PE32/ELF64 inspector, exact '.pdata' 'RUNTIME_FUNCTION' unwind bounds, 'IAT'/'EAT' + 'FF 25' thunk resolver, 'RIP'-relative ASCII/UTF-16LE strings, ECMA-335 '#~' 'TypeDef'/'MethodDef' CIL lifter, 240-root Conway-Sloane 'E8' cross-patch function differ, Cellular Sheaf 'H^1 = 0' Rust/C++23/C# struct synthesizer, PDB 7.00 / ELF64 DWARF symbol resolver, 'Module32NextW' live loaded-DLL module picker, wildcard & nibble-masked AOB signature scanner + SKSE64/F4SE trampoline codegen, and post-'D3DCompile' working-set trim ('3.1 MB' CLI / '3.2 MB' live 60 FPS GUI).",
     "- **Unified 14-Station Master Deck (':19800'):** Wired 'OmegaBraidRE' ('[Shift+F7]'), live RAM/status polling, procedural 'omega_braid_re.ico', Vault export shortcut, and ADB ':19794' tunnel into 'OmegaLabLauncher.exe'.",
     "",
     "### Quick Run (Zero Compilation Needed)",
