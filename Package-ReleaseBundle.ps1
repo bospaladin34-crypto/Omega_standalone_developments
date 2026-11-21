@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v3.0.8",
+    [string]$Version = "v3.0.9",
     [string]$BaselineCommit = "",
     [switch]$SkipRebuild
 )
@@ -9,7 +9,7 @@ if ([string]::IsNullOrWhiteSpace($BaselineCommit)) {
     try {
         $BaselineCommit = (& git -C $RepoRoot rev-parse --short HEAD 2>$null | Out-String).Trim()
     } catch { }
-    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.8" }
+    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.9" }
 }
 
 $DistDir  = Join-Path $RepoRoot "dist"

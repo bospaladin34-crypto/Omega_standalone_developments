@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace OmegaPortableConfig
 {
@@ -140,6 +141,11 @@ namespace OmegaPortableConfig
 
         public static OmegaHardwareProfile LoadAndApplyEnvironment(bool forceReload)
         {
+            return LoadAndApplyEnvironment(forceReload, false);
+        }
+
+        public static OmegaHardwareProfile LoadAndApplyEnvironment(bool forceReload, bool probeAdbSync)
+        {
             lock (_sync)
             {
                 if (_cached != null && !forceReload) return _cached;
@@ -193,7 +199,7 @@ namespace OmegaPortableConfig
                 try { Environment.SetEnvironmentVariable("OMEGA_EXTERNAL_PROJECT_DIR", p.ExternalProjectDir); } catch { }
                 try { Environment.SetEnvironmentVariable("OMEGA_GPU_NAME", p.PrimaryGpuName); } catch { }
 
-                p.DetectedAdbDevices = ProbeConnectedAdbDevices();
+                p.DetectedAdbDevices = probeAdbSync ? ProbeConnectedAdbDevices() : new List<string>();
                 _cached = p;
                 return p;
             }
@@ -235,8 +241,14 @@ namespace OmegaPortableConfig
                 using (Process pr = Process.Start(psi))
                 {
                     if (pr == null) return res;
-                    string stdout = pr.StandardOutput.ReadToEnd();
-                    pr.WaitForExit(1800);
+                    Task<string> outTask = pr.StandardOutput.ReadToEndAsync();
+                    if (!outTask.Wait(1200))
+                    {
+                        try { pr.Kill(); } catch { }
+                        return res;
+                    }
+                    string stdout = outTask.Result ?? "";
+                    pr.WaitForExit(300);
                     string[] lines = stdout.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                     for (int i = 0; i < lines.Length; i++)
                     {

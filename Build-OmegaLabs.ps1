@@ -76,7 +76,7 @@ if (-not (Test-Path $Csc)) {
 }
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host " OMEGA UNIFIED LABS v3.0.8 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
+Write-Host " OMEGA UNIFIED LABS v3.0.9 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # Stop any running station binaries before recompiling in place
@@ -356,4 +356,4 @@ if ($CreateDesktopShortcut) {
 if (-not $SkipLaunch) {
     Start-Process -FilePath $LauncherExe -WorkingDirectory $RepoRoot
 }
-Write-Host ">>> [ALL PASS] Unified Suite v3.0.8 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green
+Write-Host ">>> [ALL PASS] Unified Suite v3.0.9 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green

@@ -19,6 +19,7 @@ namespace OmegaStandaloneLab
         private static TcpListener _listener;
         private static volatile bool _running;
         public static volatile string LastChaosSummary = "READY (Click Run 8-Vector Chaos Suite or POST /api/chaos)";
+        public static Action ShowMainDeckAction;
 
         public static void EnsureStarted(int port)
         {
@@ -67,6 +68,17 @@ namespace OmegaStandaloneLab
                         string[] parts = first.Split(' ');
                         string path = parts.Length > 1 ? parts[1].Split('?')[0].ToLowerInvariant() : "/";
 
+                        if (path == "/api/show")
+                        {
+                            Action showAct = ShowMainDeckAction;
+                            if (showAct != null) { try { showAct(); } catch { } }
+                            byte[] sraw = Encoding.UTF8.GetBytes("{\"ok\":true,\"shown\":true,\"port\":19800}");
+                            string shdr = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + sraw.Length + "\r\nConnection: close\r\n\r\n";
+                            byte[] shb = Encoding.ASCII.GetBytes(shdr);
+                            ns.Write(shb, 0, shb.Length);
+                            ns.Write(sraw, 0, sraw.Length);
+                            return;
+                        }
                         OmegaHardwareProfile prof = OmegaHardwareConfig.LoadAndApplyEnvironment(false);
                         if (path == "/api/chaos")
                         {
@@ -77,7 +89,7 @@ namespace OmegaStandaloneLab
                         }
 
                         string body = string.Format(CultureInfo.InvariantCulture,
-                            "{{\"ok\":true,\"service\":\"OmegaUnifiedLabDeck v3.0.0\",\"port\":19800,\"host\":\"{0}\",\"gpu\":\"{1}\",\"gpu_vram_mb\":{2},\"adb_devices\":{3},\"last_chaos\":\"{4}\"}}",
+                            "{{\"ok\":true,\"service\":\"OmegaUnifiedLabDeck v3.0.9\",\"port\":19800,\"host\":\"{0}\",\"gpu\":\"{1}\",\"gpu_vram_mb\":{2},\"adb_devices\":{3},\"last_chaos\":\"{4}\"}}",
                             Esc(prof.HostAlias), Esc(prof.PrimaryGpuName), prof.PrimaryGpuVramMb, prof.DetectedAdbDevices.Count, Esc(LastChaosSummary));
                         byte[] raw = Encoding.UTF8.GetBytes(body);
                         string hdr = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + raw.Length + "\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
@@ -108,8 +120,8 @@ namespace OmegaStandaloneLab
 
         public OmegaUnifiedChaosAndConfigDialog()
         {
-            OmegaHardwareProfile p = OmegaHardwareConfig.LoadAndApplyEnvironment(true);
-            Text = "Omega Unified Lab v3.0.0 :: Hardware Profile (omega.config.json) & 8-Vector R&D Chaos Harness (:19800)";
+            OmegaHardwareProfile p = OmegaHardwareConfig.LoadAndApplyEnvironment(true, true);
+            Text = "Omega Unified Lab v3.0.9 :: Hardware Profile (omega.config.json) & 8-Vector R&D Chaos Harness (:19800)";
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(920, 660);
             BackColor = Color.FromArgb(10, 15, 28);

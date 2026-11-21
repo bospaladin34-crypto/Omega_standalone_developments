@@ -71,7 +71,7 @@ namespace OmegaStandaloneLab
         private readonly RichTextBox _rtbGemmaOut;
         private readonly TextBox _txtGemmaIn;
         private readonly System.Windows.Forms.Timer _tmr;
-        private readonly NotifyIcon _trayIcon;
+        private NotifyIcon _trayIcon;
         private HttpWebRequest _activeGemmaReq;
         private volatile bool _abortGemma = false;
         private volatile bool _polling = false;
@@ -115,8 +115,11 @@ namespace OmegaStandaloneLab
             Directory.CreateDirectory(_dlDir);
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.8 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
-            ClientSize = new Size(1124, 924);
+            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.9 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
+            Rectangle wa = Screen.PrimaryScreen != null ? Screen.PrimaryScreen.WorkingArea : new Rectangle(0, 0, 1920, 1080);
+            int fitH = Math.Min(924, Math.Max(680, wa.Height - 38));
+            ClientSize = new Size(1124, fitH);
+            if (fitH < 924) { AutoScroll = true; AutoScrollMinSize = new Size(1104, 924); }
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -124,11 +127,11 @@ namespace OmegaStandaloneLab
             ForeColor = Color.White;
             KeyPreview = true;
             AllowDrop = true;
-            try { string ic = Path.Combine(root, "icons", "omega_lab.ico"); if (File.Exists(ic)) Icon = new Icon(ic); } catch { }
+            try { Icon assoc = Icon.ExtractAssociatedIcon(Application.ExecutablePath); if (assoc != null) Icon = assoc; } catch { }
 
             Label sub = new Label();
             sub.UseMnemonic = false;
-            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.8 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.4.0 (:19794) [Shift+F7]";
+            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.9 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.4.0 (:19794) [Shift+F7]";
             sub.SetBounds(18, 8, 1088, 18);
             sub.ForeColor = C(56, 189, 248);
             sub.Font = new Font("Segoe UI Semibold", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
@@ -552,7 +555,7 @@ namespace OmegaStandaloneLab
             _lAct.ForeColor = C(52, 211, 153);
             _lAct.TextAlign = ContentAlignment.MiddleLeft;
             _lAct.Padding = new Padding(14, 0, 0, 0);
-            _lAct.Text = "Launcher v3.0.8 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
+            _lAct.Text = "Launcher v3.0.9 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
             bot.Controls.Add(_lAct);
 
             Controls.AddRange(new Control[]
@@ -563,19 +566,35 @@ namespace OmegaStandaloneLab
                 gemmaDeck, bot
             });
 
-            _trayIcon = new NotifyIcon();
-            _trayIcon.Text = "Omega Unified Lab v3.0.8 (14 Stations)";
-            try { string tic = Path.Combine(root, "icons", "omega_lab.ico"); if (File.Exists(tic)) _trayIcon.Icon = new Icon(tic); else _trayIcon.Icon = SystemIcons.Application; }
-            catch { _trayIcon.Icon = SystemIcons.Application; }
-            _trayIcon.ContextMenuStrip = BuildUnifiedLauncherMenu();
-            _trayIcon.Visible = true;
-            _trayIcon.DoubleClick += delegate { ShowWindow(Handle, 9); ForceWindowToForeground(Handle); };
-            FormClosing += delegate { try { _trayIcon.Visible = false; _trayIcon.Dispose(); } catch { } };
+            OmegaUnifiedDeckHttpServer.ShowMainDeckAction = delegate { ShowMainDeckFromSelf(); };
+            FormClosing += delegate
+            {
+                OmegaUnifiedDeckHttpServer.ShowMainDeckAction = null;
+                try { if (_trayIcon != null) { _trayIcon.Visible = false; _trayIcon.Dispose(); _trayIcon = null; } } catch { }
+            };
 
             _tmr = new System.Windows.Forms.Timer();
             _tmr.Interval = 2200;
             _tmr.Tick += delegate { RefreshAsync(); };
-            Shown += delegate { RefreshAsync(); DiscoverLauncherModelsAsync(); _tmr.Start(); };
+            Shown += delegate
+            {
+                ShowMainDeckFromSelf();
+                try
+                {
+                    _trayIcon = new NotifyIcon();
+                    _trayIcon.Text = "Omega Unified Lab v3.0.9 (14 Stations)";
+                    Icon trayIc = null;
+                    try { trayIc = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+                    _trayIcon.Icon = (trayIc != null) ? trayIc : SystemIcons.Application;
+                    _trayIcon.ContextMenuStrip = BuildUnifiedLauncherMenu();
+                    _trayIcon.DoubleClick += delegate { ShowMainDeckFromSelf(); };
+                    _trayIcon.Visible = true;
+                }
+                catch { }
+                RefreshAsync();
+                DiscoverLauncherModelsAsync();
+                _tmr.Start();
+            };
         }
 
         private void AppendGemmaLine(string text, Color fg)
@@ -1023,7 +1042,7 @@ namespace OmegaStandaloneLab
                 _globalCtrlShiftF7Armed = RegisterHotKey(Handle, HK_CTRL_SHIFT_F7_BRAIDRE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.F7);
                 if (_lAct != null)
                 {
-                    _lAct.Text = "Launcher v3.0.8 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
+                    _lAct.Text = "Launcher v3.0.9 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
                         " -> OmegaBraidRE v1.4.0 (:19794) | F1..F4 | F7=Shell | F12=Stop";
                 }
             }
@@ -1850,6 +1869,28 @@ namespace OmegaStandaloneLab
             }
         }
 
+        private void ShowMainDeckFromSelf()
+        {
+            if (IsDisposed) return;
+            Action act = delegate
+            {
+                try
+                {
+                    if (!Visible) Show();
+                    if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+                    ShowWindow(Handle, 9);
+                    TopMost = true;
+                    BringToFront();
+                    Activate();
+                    TopMost = false;
+                    ForceWindowToForeground(Handle);
+                }
+                catch { }
+            };
+            if (InvokeRequired) { try { BeginInvoke(act); } catch { } }
+            else act();
+        }
+
         private void LaunchStationWithArgs(string exe, string args, string title)
         {
             try
@@ -1891,7 +1932,7 @@ namespace OmegaStandaloneLab
         private ContextMenuStrip BuildUnifiedLauncherMenu()
         {
             ContextMenuStrip m = new ContextMenuStrip();
-            m.Items.Add("00. Focus Unified Master Deck (:19800)", null, delegate { ShowWindow(Handle, 9); ForceWindowToForeground(Handle); });
+            m.Items.Add("00. Focus Unified Master Deck (:19800)", null, delegate { ShowMainDeckFromSelf(); });
             m.Items.Add(new ToolStripSeparator());
             m.Items.Add("01. OmegaMirror v0.9 (:19777) [F2]", null, delegate { LaunchOrFocus("OmegaMirror", _mrExe, "OmegaMirror v0.9"); });
             m.Items.Add("02. OmegaBrowser + Native Workbench (:9778) [F1]", null, delegate { LaunchOrFocus("OmegaBrowser", _brExe, "OmegaBrowser v0.6.6"); });
@@ -1986,7 +2027,7 @@ namespace OmegaStandaloneLab
                         LaunchOrFocus("OmegaConductor", _cdExe, "OmegaConductor v1.0.0 GM");
                         LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM");
                         LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.4.0 GM");
-                        SetAct("Full 14-Station Suite v3.0.8 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
+                        SetAct("Full 14-Station Suite v3.0.9 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
                     });
                 }
                 catch { }
@@ -2499,15 +2540,22 @@ namespace OmegaStandaloneLab
             {
                 try
                 {
+                    if (ProbePort(19800))
+                    {
+                        string wake = HttpGetFast("http://127.0.0.1:19800/api/show", 800);
+                        if (!string.IsNullOrEmpty(wake) && wake.IndexOf("\"shown\":true", StringComparison.Ordinal) >= 0)
+                        {
+                            return;
+                        }
+                    }
                     int myPid;
                     using (Process me = Process.GetCurrentProcess()) { myPid = me.Id; }
-                    Process[] existing = Process.GetProcessesByName("OmegaLabLauncher");
-                    for (int i = 0; i < existing.Length; i++)
+                    Process[] stale = Process.GetProcessesByName("OmegaLabLauncher");
+                    for (int i = 0; i < stale.Length; i++)
                     {
-                        if (existing[i].Id != myPid && existing[i].MainWindowHandle != IntPtr.Zero)
+                        if (stale[i].Id != myPid)
                         {
-                            ForceWindowToForeground(existing[i].MainWindowHandle);
-                            return;
+                            try { stale[i].Kill(); stale[i].WaitForExit(400); } catch { }
                         }
                     }
                 }
@@ -2532,10 +2580,33 @@ namespace OmegaStandaloneLab
                 if (a == "--avf-dispatch-udot") { EnsureHostPort19789BridgedStatic(r); Console.WriteLine(HttpGetFast("http://127.0.0.1:19789/api/dispatch/udot", 15000)); return; }
                 if (a == "--make-icons") { MakeIco(Path.Combine(r, "icons", "omega_lab.ico"), 56, 189, 248, "O1"); MakeIco(Path.Combine(r, "icons", "omega_browser.ico"), 2, 132, 199, "BR"); MakeIco(Path.Combine(r, "icons", "omega_mirror.ico"), 15, 118, 110, "MR"); MakeIco(Path.Combine(r, "icons", "omega_av.ico"), 168, 85, 247, "AV"); MakeIco(Path.Combine(r, "icons", "omega_forge.ico"), 16, 185, 129, "OF"); MakeIco(Path.Combine(r, "icons", "omega_shell.ico"), 14, 165, 233, "OS"); MakeIco(Path.Combine(r, "icons", "omega_synth.ico"), 236, 72, 153, "SY"); MakeIco(Path.Combine(r, "icons", "omega_sonar.ico"), 6, 148, 162, "SN"); MakeIco(Path.Combine(r, "icons", "omega_penrose.ico"), 20, 184, 166, "PN"); MakeIco(Path.Combine(r, "icons", "omega_sheaf.ico"), 16, 185, 129, "SF"); MakeIco(Path.Combine(r, "icons", "omega_steg.ico"), 245, 158, 11, "SG"); MakeIco(Path.Combine(r, "icons", "omega_conductor.ico"), 13, 148, 136, "CD"); MakeIco(Path.Combine(r, "icons", "omega_tensor.ico"), 124, 58, 237, "TN"); MakeIco(Path.Combine(r, "icons", "omega_braid_re.ico"), 14, 116, 144, "RE"); return; }
             }
-            try { Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException); Application.ThreadException += delegate { }; AppDomain.CurrentDomain.UnhandledException += delegate { }; } catch { }
+            string diagLog = Path.Combine(r, "workspace", "launcher_startup.log");
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(r, "workspace"));
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += delegate(object s, ThreadExceptionEventArgs te)
+                {
+                    try { File.AppendAllText(diagLog, DateTime.UtcNow.ToString("o") + " [UI] " + te.Exception + "\r\n"); } catch { }
+                };
+                AppDomain.CurrentDomain.UnhandledException += delegate(object s, UnhandledExceptionEventArgs ue)
+                {
+                    try { File.AppendAllText(diagLog, DateTime.UtcNow.ToString("o") + " [DOMAIN] " + ue.ExceptionObject + "\r\n"); } catch { }
+                };
+            }
+            catch { }
             try { SetProcessDPIAware(); } catch { }
-            Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new OmegaLabLauncherForm(r));
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            try
+            {
+                Application.Run(new OmegaLabLauncherForm(r));
+            }
+            catch (Exception ex)
+            {
+                try { File.AppendAllText(diagLog, DateTime.UtcNow.ToString("o") + " [MAIN] " + ex + "\r\n"); } catch { }
+                MessageBox.Show("OmegaLabLauncher startup error:\r\n" + ex.Message, "Omega Unified Lab", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
