@@ -2,10 +2,68 @@ param(
     [switch]$SkipLaunch,
     [switch]$RunStressSuites,
     [switch]$SkipRust,
-    [switch]$CreateDesktopShortcut
+    [switch]$CreateDesktopShortcut,
+    [switch]$OnlyShortcut
 )
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+function Sync-SingleUnifiedDesktopShortcut {
+    param([string]$RootDir, [string]$MasterExe, [string]$IconDir)
+    $DesktopDir = [Environment]::GetFolderPath("Desktop")
+    if ([string]::IsNullOrWhiteSpace($DesktopDir) -or -not (Test-Path -LiteralPath $DesktopDir)) { return }
+    $ArchiveDir = Join-Path $RootDir "workspace\archived_desktop_shortcuts"
+    New-Item -ItemType Directory -Path $ArchiveDir -Force | Out-Null
+
+    $Wsh = New-Object -ComObject WScript.Shell
+    $CanonicalName = "Omega Unified Lab.lnk"
+    $CanonicalPath = Join-Path $DesktopDir $CanonicalName
+    $ArchivedCount = 0
+
+    $StationExePattern = "(OmegaLabLauncher|OmegaMirror|OmegaBrowser|OmegaAV|OmegaSynth|OmegaSonar|OmegaSheaf|OmegaPenrose|OmegaSteg|OmegaForge|OmegaShell|OmegaConductor|OmegaTensor|OmegaBraidRE|OmegaWorkbench|OmegaPocket|OmegaVault|OmegaSpatial|OmegaRnD)"
+    $LegacyNamePattern = "^(Omega\s*(Mirror|Browser|AV|Synth|Sonar|Sheaf|Penrose|Steg|Forge|Shell|Conductor|Tensor|BraidRE|Workbench|Pocket|Vault|Spatial|Standalone|RnD|R&D\s+Lab)|ACT-Omega\s+Lab\b)"
+
+    $ScanDirs = @($DesktopDir, (Join-Path $env:USERPROFILE "Desktop"), [Environment]::GetFolderPath("CommonDesktopDirectory")) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+    $DesktopLinks = @()
+    foreach ($Sdir in $ScanDirs) {
+        $DesktopLinks += @(Get-ChildItem -LiteralPath $Sdir -Filter "*.lnk" -File -ErrorAction SilentlyContinue)
+    }
+    foreach ($LnkFile in $DesktopLinks) {
+        if ($LnkFile.Name -ieq $CanonicalName) { continue }
+        $ShouldArchive = $false
+        if ($LnkFile.BaseName -imatch $LegacyNamePattern) {
+            $ShouldArchive = $true
+        } else {
+            try {
+                $ScInfo = $Wsh.CreateShortcut($LnkFile.FullName)
+                $Tgt = [string]$ScInfo.TargetPath
+                if ($Tgt -imatch $StationExePattern -or $Tgt -imatch "Omega_standalone_developments|OmegaStandaloneLab|OmegaRnDLab|Omega_Standalone_Labs") {
+                    $ShouldArchive = $true
+                }
+            } catch { }
+        }
+        if ($ShouldArchive) {
+            $DstArchive = Join-Path $ArchiveDir $LnkFile.Name
+            Move-Item -LiteralPath $LnkFile.FullName -Destination $DstArchive -Force
+            $ArchivedCount++
+        }
+    }
+
+    $Lnk = $Wsh.CreateShortcut($CanonicalPath)
+    $Lnk.TargetPath = $MasterExe
+    $Lnk.WorkingDirectory = $RootDir
+    $Ico = Join-Path $IconDir "omega_lab.ico"
+    if (Test-Path -LiteralPath $Ico) { $Lnk.IconLocation = $Ico }
+    $Lnk.Description = "Omega Unified Lab (Single Launcher for All 14 Stations & R&D Sub-Modes)"
+    $Lnk.Save()
+    Write-Host ("  [DESKTOP CLEAN] Single shortcut active: '{0}' (archived {1} redundant .lnk icons -> workspace\archived_desktop_shortcuts)" -f $CanonicalName, $ArchivedCount) -ForegroundColor Green
+}
+
+if ($OnlyShortcut) {
+    Sync-SingleUnifiedDesktopShortcut -RootDir $RepoRoot -MasterExe (Join-Path $RepoRoot "OmegaLabLauncher.exe") -IconDir (Join-Path $RepoRoot "icons")
+    exit 0
+}
+
 $env:OMEGA_LAB_ROOT = $RepoRoot
 
 if (-not (Test-Path (Join-Path $RepoRoot "config\omega.config.json"))) {
@@ -18,7 +76,7 @@ if (-not (Test-Path $Csc)) {
 }
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host " OMEGA UNIFIED LABS v3.0.7 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
+Write-Host " OMEGA UNIFIED LABS v3.0.8 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # Stop any running station binaries before recompiling in place
@@ -291,19 +349,11 @@ if ($RunStressSuites) {
 
 if ($CreateDesktopShortcut) {
     try {
-        $DesktopDir = [Environment]::GetFolderPath("Desktop")
-        $Wsh = New-Object -ComObject WScript.Shell
-        $Lnk = $Wsh.CreateShortcut((Join-Path $DesktopDir "Omega Standalone Labs v3.0.7.lnk"))
-        $Lnk.TargetPath = $LauncherExe
-        $Lnk.WorkingDirectory = $RepoRoot
-        $Ico = Join-Path $IconsDir "omega_lab.ico"
-        if (Test-Path $Ico) { $Lnk.IconLocation = $Ico }
-        $Lnk.Description = "Omega Unified Standalone & R&D Labs v3.0.7 (14 Stations)"
-        $Lnk.Save()
+        Sync-SingleUnifiedDesktopShortcut -RootDir $RepoRoot -MasterExe $LauncherExe -IconDir $IconsDir
     } catch { }
 }
 
 if (-not $SkipLaunch) {
     Start-Process -FilePath $LauncherExe -WorkingDirectory $RepoRoot
 }
-Write-Host ">>> [ALL PASS] Unified Suite v3.0.7 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green
+Write-Host ">>> [ALL PASS] Unified Suite v3.0.8 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green

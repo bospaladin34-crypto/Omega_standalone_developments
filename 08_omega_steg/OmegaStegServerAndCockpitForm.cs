@@ -2055,6 +2055,11 @@ namespace OmegaStegStudio
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            if (args != null && args.Length > 0 && string.Equals(args[0], "--vault", StringComparison.OrdinalIgnoreCase))
+            {
+                Application.Run(new OmegaVaultDrawerDialog());
+                return;
+            }
             string initFile = (args != null && args.Length > 0) ? args[0] : "";
             Application.Run(new OmegaStegCockpitForm(initFile));
         }

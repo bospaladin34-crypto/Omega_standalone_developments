@@ -1,4 +1,4 @@
-# Omega Standalone Developments — Unified Suite v3.0.7
+# Omega Standalone Developments — Unified Suite v3.0.8
 
 [![Windows CI](https://github.com/bospaladin34-crypto/Omega_standalone_developments/actions/workflows/ci-windows.yml/badge.svg?branch=vesper_production)](https://github.com/bospaladin34-crypto/Omega_standalone_developments/actions/workflows/ci-windows.yml)
 [![Release Bundle](https://github.com/bospaladin34-crypto/Omega_standalone_developments/actions/workflows/release-windows-x64.yml/badge.svg)](https://github.com/bospaladin34-crypto/Omega_standalone_developments/actions/workflows/release-windows-x64.yml)
@@ -16,7 +16,7 @@
 | :--- | :--- | :--- |
 | **ACT-Omega Web & Telemetry Portal** | [https://act-omega-net.dev/](https://act-omega-net.dev/) | Live architecture portal, documentation, and remote Sovereign Manifold surface |
 | **Mainline Sovereign Manifold Repo** | [bospaladin34-crypto/Sovereign-Manifold-V30-A.P.H.U.S-](https://github.com/bospaladin34-crypto/Sovereign-Manifold-V30-A.P.H.U.S-) | Upstream `ACT-Omega` mainline runtime (`https://github.com/bospaladin34-crypto/Sovereign-Manifold-V30-A.P.H.U.S-.git`) |
-| **Instant Prebuilt Windows x64 (`v3.0.7`)** | [Download Latest Prebuilt `.zip` + `SHA256SUMS.txt`](https://github.com/bospaladin34-crypto/Omega_standalone_developments/releases/latest) | Ready-to-run prebuilt bundle (`14/14` signed-hash `.exe` stations + `SHA256SUMS.txt`, zero build setup required) |
+| **Instant Prebuilt Windows x64 (`v3.0.8`)** | [Download Latest Prebuilt `.zip` + `SHA256SUMS.txt`](https://github.com/bospaladin34-crypto/Omega_standalone_developments/releases/latest) | Ready-to-run prebuilt bundle (`14/14` signed-hash `.exe` stations + `SHA256SUMS.txt`, zero build setup required) |
 
 ## 3-Step Source Quickstart (Any Windows 10 / Windows 11 PC)
 
@@ -31,7 +31,7 @@ powershell -ExecutionPolicy Bypass -File .\Init-OmegaHardware.ps1
 powershell -ExecutionPolicy Bypass -File .\Build-OmegaLabs.ps1 -RunStressSuites -CreateDesktopShortcut
 ```
 
-* **Zero-Compile Prebuilt Option**: Prefer not to run the compiler script? Grab [`Omega_Standalone_Labs_v3.0.7_win-x64_Prebuilt.zip`](https://github.com/bospaladin34-crypto/Omega_standalone_developments/releases/latest), verify its digest against `SHA256SUMS.txt`, extract anywhere, and launch `OmegaLabLauncher.exe`.
+* **Zero-Compile Prebuilt Option**: Prefer not to run the compiler script? Grab [`Omega_Standalone_Labs_v3.0.8_win-x64_Prebuilt.zip`](https://github.com/bospaladin34-crypto/Omega_standalone_developments/releases/latest), verify its digest against `SHA256SUMS.txt`, extract anywhere, and launch `OmegaLabLauncher.exe`.
 * **0 Android phones required**: Every station runs 100% locally on any Windows 10/11 PC (NVIDIA, AMD, Intel Arc, or CPU/GDI+ automatic fallback).
 * **0 external DLLs required**: `02_omega_browser` automatically uses `Microsoft.Web.WebView2` if installed locally or in your NuGet cache, and seamlessly compiles a zero-DLL Native Workbench browser/PDF harvester on `:9778` otherwise.
 * **Plug-and-Play `0..N` Android / Linux Edge Scaling**: Plug in 1, 2, or more Android devices over USB or Wi-Fi ADB at any time to unlock live screen mirroring (`:19777`), ARMv8/ARMv9/Vulkan/NPU worker offload (`:19788/:19789`, `:19792/:19793`), and heterogeneous split-inference (`:19791`).
@@ -62,7 +62,7 @@ Running `.\Init-OmegaHardware.ps1` generates `config/omega.config.json` (which i
 
 ```json
 {
-  "suite_version": "3.0.7",
+  "suite_version": "3.0.8",
   "host_alias": "my-workstation",
   "gpu_label": "AUTO_DETECT_DXGI",
   "downloads_dir": "downloads",
@@ -80,7 +80,7 @@ Running `.\Init-OmegaHardware.ps1` generates `config/omega.config.json` (which i
   * Universal C11 edge worker: `gcc -O3 -std=c11 -pthread 11_omega_edge_workers/c11_universal_worker/omega_pocket_worker.c -lm -ldl -o omega_pocket_worker`
   * Universal C11 binary lifter & differ: `gcc -O3 -std=c11 -Wall -Wextra -Werror 14_omega_braid_re/c11_cli/omega_braid_re_cli.c -lm -o omega_braid_re_cli`
 
-## Reference Hardware Verification Benchmarks (`v3.0.7 GM`)
+## Reference Hardware Verification Benchmarks (`v3.0.8 GM`)
 
 Verified on bare metal and GitHub Actions Windows x64 runners across a 3-device + 2-AVF-VM heterogeneous testbed (`14/14` Windows binaries + `15/15` `#![no_std]` Rust invariant tests + `307,080+` randomized stress-test trials):
 

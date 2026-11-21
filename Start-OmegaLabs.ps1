@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("Deck","All","Browser","Mirror","AV","Synth","Sonar","Sheaf","Penrose","Steg","Forge","Shell","Conductor","Tensor","BraidRE","EdgeDeploy","StressAll","Tunnel","Stop")]
+    [ValidateSet("Deck","All","Browser","Mirror","AV","Synth","Sonar","Sheaf","Penrose","Steg","Forge","Shell","Conductor","Tensor","BraidRE","EdgeDeploy","StressAll","Tunnel","CleanDesktop","Stop")]
     [string]$Mode = "Deck"
 )
 $ErrorActionPreference = "Stop"
@@ -31,7 +31,8 @@ switch ($Mode) {
     "Deck"       { Start-Process -FilePath $Lx -WorkingDirectory $R }
     "EdgeDeploy" { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $R "11_omega_edge_workers\rust_p10_worker\Deploy-And-Run-Pixel10Worker.ps1") -Action BenchAndDaemon }
     "StressAll"  { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $R "Build-OmegaLabs.ps1") -SkipLaunch -RunStressSuites }
-    "Tunnel"     { & $Lx --arm-pixels }
+    "Tunnel"       { & $Lx --arm-pixels }
+    "CleanDesktop" { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $R "Build-OmegaLabs.ps1") -OnlyShortcut -CreateDesktopShortcut }
     "All"        {
         foreach ($k in $Map.Keys) {
             $exe = $Map[$k]
