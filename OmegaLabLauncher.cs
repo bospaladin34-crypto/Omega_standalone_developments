@@ -63,7 +63,7 @@ namespace OmegaStandaloneLab
         private bool _globalCtrlShiftF7Armed = false;
         private static readonly string FENCE = new string((char)96, 3);
 
-        private readonly string _root, _mrDir, _brDir, _avDir, _syDir, _snDir, _sfDir, _pnDir, _sgDir, _fgDir, _shDir, _p10Dir, _cdDir, _tnDir, _reDir, _dlDir, _mrExe, _brExe, _avExe, _syExe, _snExe, _sfExe, _pnExe, _sgExe, _fgExe, _shExe, _cdExe, _tnExe, _reExe, _harvPs1;
+        private readonly string _root, _mrDir, _brDir, _avDir, _syDir, _snDir, _sfDir, _pnDir, _sgDir, _fgDir, _shDir, _p10Dir, _cdDir, _tnDir, _reDir, _enDir, _dlDir, _mrExe, _brExe, _avExe, _syExe, _snExe, _sfExe, _pnExe, _sgExe, _fgExe, _shExe, _cdExe, _tnExe, _reExe, _enExe, _harvPs1;
         private readonly Label _lBr, _lMr, _lAv, _lRam, _lAdb, _lP10Tensor, _lCorp, _lAct, _lDrop;
         private string _cachedP10Line = "P10 10-Kernel Tensor (:19788): probing daemon...";
         private int _p10PollTick = 0;
@@ -97,6 +97,7 @@ namespace OmegaStandaloneLab
             _cdDir = Path.Combine(root, "12_omega_conductor");
             _tnDir = Path.Combine(root, "13_omega_tensor");
             _reDir = Path.Combine(root, "14_omega_braid_re");
+            _enDir = Path.Combine(root, "15_omega_engine");
             _dlDir = Path.Combine(root, "downloads");
             _mrExe = Path.Combine(_mrDir, "OmegaMirror.exe");
             _brExe = Path.Combine(_brDir, "OmegaBrowser.exe");
@@ -111,11 +112,12 @@ namespace OmegaStandaloneLab
             _cdExe = Path.Combine(_cdDir, "OmegaConductor.exe");
             _tnExe = Path.Combine(_tnDir, "OmegaTensor.exe");
             _reExe = Path.Combine(_reDir, "OmegaBraidRE.exe");
+            _enExe = Path.Combine(_enDir, "OmegaEngine.exe");
             _harvPs1 = Path.Combine(_brDir, "Invoke-OmegaHarvest.ps1");
             Directory.CreateDirectory(_dlDir);
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.0.10 (14-Station Deck + Conductor :19790 + Tensor :19791 + BraidRE :19794)";
+            Text = "ACT-Omega :: Unified Standalone & R&D Labs v3.7.1 (15-Station Deck + BraidRE :19794 + OmegaEngine 3D :19795)";
             Rectangle wa = Screen.PrimaryScreen != null ? Screen.PrimaryScreen.WorkingArea : new Rectangle(0, 0, 1920, 1080);
             int fitH = Math.Min(924, Math.Max(680, wa.Height - 38));
             ClientSize = new Size(1124, fitH);
@@ -131,19 +133,19 @@ namespace OmegaStandaloneLab
 
             Label sub = new Label();
             sub.UseMnemonic = false;
-            sub.Text = "ACT-OMEGA UNIFIED LABS v3.0.10 :: COMPLETE 14-STATION DECK + CONDUCTOR (:19790) + TENSOR (:19791) + OMEGABRAIDRE v1.4.0 (:19794) [Shift+F7]";
+            sub.Text = "ACT-OMEGA UNIFIED LABS v3.7.1 :: COMPLETE 15-STATION DECK + OMEGABRAIDRE (:19794) [Shift+F7] + OMEGAENGINE 3D (:19795) [Shift+F3]";
             sub.SetBounds(18, 8, 1088, 18);
             sub.ForeColor = C(56, 189, 248);
             sub.Font = new Font("Segoe UI Semibold", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
 
             Label hdr = new Label();
             hdr.UseMnemonic = false;
-            hdr.Text = "Unified 14-Station Master Launcher (Single Desktop Icon + System Tray Hub)";
+            hdr.Text = "Unified 15-Station Master Launcher (Single Desktop Icon + System Tray Hub)";
             hdr.SetBounds(18, 27, 302, 26);
             hdr.ForeColor = Color.White;
             hdr.Font = new Font("Segoe UI Semibold", 10.6f, FontStyle.Bold, GraphicsUnit.Pixel);
 
-            Button bHubTop = Btn("All 14 Stations & R&D Hub", 324, 23, 154, C(14, 116, 144));
+            Button bHubTop = Btn("All 15 Stations & R&D Hub", 324, 23, 154, C(14, 116, 144));
             bHubTop.Height = 32;
             bHubTop.FlatAppearance.BorderColor = C(56, 189, 248);
             bHubTop.Click += delegate { ContextMenuStrip hm = BuildUnifiedLauncherMenu(); hm.Show(bHubTop, new Point(0, bHubTop.Height)); };
@@ -208,9 +210,9 @@ namespace OmegaStandaloneLab
             bFgX.Height = 28;
             bFgX.Click += delegate { StopApps(new string[] { "OmegaForge" }); };
 
-            Button bSh = Btn("Launch / Focus OmegaShell v1.1.6 GM (:19781) [F7]", 18, 322, 348, C(2, 132, 199));
+            Button bSh = Btn("Launch / Focus OmegaShell v1.2.0 GM (:19781) [F7]", 18, 322, 348, C(2, 132, 199));
             bSh.Height = 28;
-            bSh.Click += delegate { LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.1.6 GM"); };
+            bSh.Click += delegate { LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.2.0 GM"); };
             Button bShC = Btn("AVF SSH (:22222)", 374, 322, 176, C(217, 119, 6));
             bShC.Height = 28;
             bShC.Click += delegate { TriggerAvfAutoTypeFromLauncherAsync(); };
@@ -280,13 +282,13 @@ namespace OmegaStandaloneLab
             bCdX.Height = 28;
             bCdX.Click += delegate { StopApps(new string[] { "OmegaConductor" }); };
 
-            Button bTn = Btn("Launch / Focus OmegaTensor v1.0.2 GM (:19791) [Shift+F10]", 18, 546, 348, C(124, 58, 237));
+            Button bTn = Btn("Launch / Focus OmegaTensor v1.2.0 GM (:19791) [Shift+F10]", 18, 546, 348, C(124, 58, 237));
             bTn.Height = 28;
             bTn.FlatAppearance.BorderColor = C(52, 211, 153);
-            bTn.Click += delegate { LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM (5-Engine Split)"); };
+            bTn.Click += delegate { LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.2.0 GM (5-Engine Split)"); };
             Button bTnB = Btn("Beam Split -> P10", 374, 546, 176, C(67, 56, 202));
             bTnB.Height = 28;
-            bTnB.Click += delegate { LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM"); BeamPortPathAsync(19791, "/deck"); };
+            bTnB.Click += delegate { LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.2.0 GM"); BeamPortPathAsync(19791, "/deck"); };
             Button bTnX = Btn("Stop", 558, 546, 92, C(127, 29, 29));
             bTnX.Height = 28;
             bTnX.Click += delegate { StopApps(new string[] { "OmegaTensor" }); };
@@ -302,22 +304,33 @@ namespace OmegaStandaloneLab
             bReX.Height = 28;
             bReX.Click += delegate { StopApps(new string[] { "OmegaBraidRE" }); };
 
-            Button bP10 = Btn("Pixel 10 Quad-Engine + TPU (:19788/:19789)", 18, 610, 282, C(4, 120, 87));
+            Button bEn = Btn("Launch / Focus OmegaEngine v1.7.7 (:19795) [Shift+F3]", 18, 610, 348, C(2, 132, 199));
+            bEn.Height = 28;
+            bEn.FlatAppearance.BorderColor = C(56, 189, 248);
+            bEn.Click += delegate { LaunchOrFocus("OmegaEngine", _enExe, "OmegaEngine v1.7.7 (3D DirectCompute Arena)"); };
+            Button bEnB = Btn("ReShade .fx Exports", 374, 610, 176, C(5, 150, 105));
+            bEnB.Height = 28;
+            bEnB.Click += delegate { OpenDir(Path.Combine(_dlDir, "omega_engine_exports")); };
+            Button bEnX = Btn("Stop", 558, 610, 92, C(127, 29, 29));
+            bEnX.Height = 28;
+            bEnX.Click += delegate { StopApps(new string[] { "OmegaEngine" }); };
+
+            Button bP10 = Btn("Dual-Pixel 7-Tier + TPU (:19788..:19793)", 18, 642, 282, C(4, 120, 87));
             bP10.Height = 28;
             bP10.FlatAppearance.BorderColor = C(52, 211, 153);
             bP10.Click += delegate { OmegaLabPixel10CockpitDialog.ShowOrFocus(this, _root); };
-            Button bP10Bench = Btn("Bench 13x+TPU", 306, 610, 122, C(147, 51, 234));
+            Button bP10Bench = Btn("Bench 13x+TPU", 306, 642, 122, C(147, 51, 234));
             bP10Bench.Height = 28;
             bP10Bench.Click += delegate { RunPixel10NineKernelBenchToConsoleAsync(); };
-            Button bP10Rtx = Btn("RTX + P10 Tensor", 434, 610, 118, C(180, 83, 9));
+            Button bP10Rtx = Btn("RTX + P10 Tensor", 434, 642, 118, C(180, 83, 9));
             bP10Rtx.Height = 28;
             bP10Rtx.Click += delegate { RunDualSiliconTensorBenchToConsoleAsync(); };
-            Button bP10X = Btn("Stop", 558, 610, 92, C(127, 29, 29));
+            Button bP10X = Btn("Stop", 558, 642, 92, C(127, 29, 29));
             bP10X.Height = 28;
             bP10X.Click += delegate { StopPixel10WorkerAsync(); };
 
             Panel dropPanel = new Panel();
-            dropPanel.SetBounds(18, 651, 632, 46);
+            dropPanel.SetBounds(18, 675, 632, 44);
             dropPanel.BackColor = C(13, 25, 46);
             dropPanel.AllowDrop = true;
             _lDrop = new Label();
@@ -359,40 +372,40 @@ namespace OmegaStandaloneLab
             dropPanel.DragEnter += onDe; dropPanel.DragDrop += onDd;
             _lDrop.AllowDrop = true; _lDrop.DragEnter += onDe; _lDrop.DragDrop += onDd;
 
-            Button bAll = Btn("Launch Complete 14-Station Suite + Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) [F5]", 18, 703, 632, C(124, 58, 237));
+            Button bAll = Btn("Launch Complete 15-Station Suite + BraidRE (:19794) + OmegaEngine 3D (:19795) [F5]", 18, 724, 632, C(124, 58, 237));
             bAll.Click += delegate { LaunchFullSuite(); };
 
-            Button bWifi = Btn("Promote USB -> Wireless (:5555) + Tunnels", 18, 743, 310, C(88, 28, 135));
+            Button bWifi = Btn("Promote USB -> Wireless (:5555) + Tunnels", 18, 762, 310, C(88, 28, 135));
             bWifi.Click += delegate { PromoteUsbPixelsAsync(); };
 
-            Button bSplit = Btn("Split-OLED: P1 Synth MPE | P2 OmegaAV", 340, 743, 310, C(55, 48, 163));
+            Button bSplit = Btn("Split-OLED: P1 Synth MPE | P2 OmegaAV", 340, 762, 310, C(55, 48, 163));
             bSplit.Click += delegate { BeamSplitOledAsync(); };
 
-            Button bHarv = Btn("Corpus Harvester", 18, 783, 152, C(6, 95, 70));
+            Button bHarv = Btn("Corpus Harvester", 18, 800, 152, C(6, 95, 70));
             bHarv.Click += delegate
             {
                 if (File.Exists(_harvPs1)) { Process.Start("powershell.exe", "-NoExit -ExecutionPolicy Bypass -File \"" + _harvPs1 + "\""); SetAct("Started Corpus Harvester -> Invoke-OmegaHarvest.ps1"); }
                 else SetAct("Harvester missing: " + _harvPs1);
             };
 
-            Button bVlt = Btn("Vaults & Downloads", 178, 783, 152, C(30, 58, 138));
+            Button bVlt = Btn("Vaults & Downloads", 178, 800, 152, C(30, 58, 138));
             bVlt.Click += delegate { ShowVaultMenu(bVlt); };
 
-            Button bSync = Btn("Push -> Bridge (F9)", 338, 783, 152, C(5, 150, 105));
+            Button bSync = Btn("Push -> Bridge (F9)", 338, 800, 152, C(5, 150, 105));
             bSync.Click += delegate { SyncBridgeAsync(); };
 
-            Button bManualRow = Btn("Help & FAQ (F6)", 498, 783, 152, C(180, 83, 9));
+            Button bManualRow = Btn("Help & FAQ (F6)", 498, 800, 152, C(180, 83, 9));
             bManualRow.FlatAppearance.BorderColor = C(250, 204, 21);
             bManualRow.Click += delegate { OpenHumanManual(); };
 
-            Button bStop = Btn("Stop All 14 Standalone Lab Processes + Pixel 10 Worker (Free GPU VRAM & RAM) [F12]", 18, 823, 632, C(153, 27, 27));
-            bStop.Click += delegate { StopApps(new string[] { "OmegaBraidRE", "OmegaConductor", "OmegaTensor", "OmegaSonar", "OmegaSteg", "OmegaSheaf", "OmegaPenrose", "OmegaSynth", "OmegaShell", "OmegaForge", "OmegaAV", "OmegaBrowser", "OmegaMirror", "omega_p10_worker_host" }); StopPixel10WorkerAsync(); };
+            Button bStop = Btn("Stop All 15 Standalone Lab Processes + Pixel 10 Worker (Free GPU VRAM & RAM) [F12]", 18, 838, 632, C(153, 27, 27));
+            bStop.Click += delegate { StopApps(new string[] { "OmegaEngine", "OmegaBraidRE", "OmegaConductor", "OmegaTensor", "OmegaSonar", "OmegaSteg", "OmegaSheaf", "OmegaPenrose", "OmegaSynth", "OmegaShell", "OmegaForge", "OmegaAV", "OmegaBrowser", "OmegaMirror", "omega_p10_worker_host" }); StopPixel10WorkerAsync(); };
 
             // =========================================================================
             // RIGHT COLUMN (x = 664..1106): GEMMA OMEGALABS COMMANDER & CODEGEN DECK
             // =========================================================================
             Panel gemmaDeck = new Panel();
-            gemmaDeck.SetBounds(664, 23, 442, 834);
+            gemmaDeck.SetBounds(664, 23, 442, 849);
             gemmaDeck.BackColor = C(13, 19, 34);
             gemmaDeck.BorderStyle = BorderStyle.FixedSingle;
 
@@ -555,13 +568,13 @@ namespace OmegaStandaloneLab
             _lAct.ForeColor = C(52, 211, 153);
             _lAct.TextAlign = ContentAlignment.MiddleLeft;
             _lAct.Padding = new Padding(14, 0, 0, 0);
-            _lAct.Text = "Launcher v3.0.10 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
+            _lAct.Text = "Launcher v3.7.1 Ready :: F1..F4 | F7=Shell | Shift+F7=BraidRE (:19794) | Shift+F3=Engine (:19795) | Shift+F10=Tensor (:19791) | Shift+F11=Conductor | F12=Stop";
             bot.Controls.Add(_lAct);
 
             Controls.AddRange(new Control[]
             {
                 sub, hdr, bHubTop, bHelpTop, card,
-                bBr, bFrz, bBrX, bMr, bMrB, bMrX, bAv, bAvB, bAvX, bFg, bFgW, bFgX, bSh, bShC, bShX, bSy, bSyB, bSyX, bSn, bSnB, bSnX, bPn, bPnB, bPnX, bSf, bSfB, bSfX, bSg, bSgB, bSgX, bCd, bCdB, bCdX, bTn, bTnB, bTnX, bRe, bReB, bReX, bP10, bP10Bench, bP10Rtx, bP10X,
+                bBr, bFrz, bBrX, bMr, bMrB, bMrX, bAv, bAvB, bAvX, bFg, bFgW, bFgX, bSh, bShC, bShX, bSy, bSyB, bSyX, bSn, bSnB, bSnX, bPn, bPnB, bPnX, bSf, bSfB, bSfX, bSg, bSgB, bSgX, bCd, bCdB, bCdX, bTn, bTnB, bTnX, bRe, bReB, bReX, bEn, bEnB, bEnX, bP10, bP10Bench, bP10Rtx, bP10X,
                 dropPanel, bAll, bWifi, bSplit, bHarv, bVlt, bSync, bManualRow, bStop,
                 gemmaDeck, bot
             });
@@ -582,7 +595,7 @@ namespace OmegaStandaloneLab
                 try
                 {
                     _trayIcon = new NotifyIcon();
-                    _trayIcon.Text = "Omega Unified Lab v3.0.10 (14 Stations)";
+                    _trayIcon.Text = "Omega Unified Lab v3.7.1 (15 Stations)";
                     Icon trayIc = null;
                     try { trayIc = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
                     _trayIcon.Icon = (trayIc != null) ? trayIc : SystemIcons.Application;
@@ -783,7 +796,7 @@ namespace OmegaStandaloneLab
                             string genFile = ExtractJsonField(raw, "generated_file");
                             if (!string.IsNullOrEmpty(genFile)) _lastGeneratedArtifact = genFile;
                             AppendGemmaLine(string.IsNullOrEmpty(narr) ? raw : narr, C(226, 232, 240));
-                            SetAct("Gemma Suite Mission complete via OmegaShell v1.1.6 GM (:19781)!");
+                            SetAct("Gemma Suite Mission complete via OmegaShell v1.2.0 GM (:19781)!");
                         }
                         else
                         {
@@ -868,7 +881,7 @@ namespace OmegaStandaloneLab
 
         private void OpenLastArtifactInShellStudio()
         {
-            LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.1.6 GM");
+            LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.2.0 GM");
             if (!string.IsNullOrEmpty(_lastGeneratedArtifact) && File.Exists(_lastGeneratedArtifact))
             {
                 string target = _lastGeneratedArtifact;
@@ -1042,8 +1055,8 @@ namespace OmegaStandaloneLab
                 _globalCtrlShiftF7Armed = RegisterHotKey(Handle, HK_CTRL_SHIFT_F7_BRAIDRE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, (uint)Keys.F7);
                 if (_lAct != null)
                 {
-                    _lAct.Text = "Launcher v3.0.10 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
-                        " -> OmegaBraidRE v1.4.0 (:19794) | F1..F4 | F7=Shell | F12=Stop";
+                    _lAct.Text = "Launcher v3.7.1 Ready :: Global " + (_globalShiftF7Armed ? "[Shift+F7 ARMED]" : "[Ctrl+Shift+F7 ARMED]") +
+                        " -> OmegaBraidRE v1.4.0 (:19794) | Shift+F3=Engine (:19795) | F1..F4 | F7=Shell | F12=Stop";
                 }
             }
             catch { }
@@ -1128,6 +1141,7 @@ namespace OmegaStandaloneLab
 
             if (e.KeyCode == Keys.F1) LaunchOrFocus("OmegaBrowser", _brExe, "OmegaBrowser v0.6.4");
             else if (e.KeyCode == Keys.F2) LaunchOrFocus("OmegaMirror", _mrExe, "OmegaMirror v0.9");
+            else if (e.Shift && e.KeyCode == Keys.F3) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaEngine", _enExe, "OmegaEngine v1.7.7 GM"); }
             else if (e.KeyCode == Keys.F3) LaunchOrFocus("OmegaAV", _avExe, "OmegaAV v0.7.5");
             else if (e.KeyCode == Keys.F4) LaunchOrFocus("OmegaForge", _fgExe, "OmegaForge v0.2.1");
             else if (e.Shift && e.KeyCode == Keys.F5) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaSonar", _snExe, "OmegaSonar v1.1.0 GM"); }
@@ -1135,8 +1149,8 @@ namespace OmegaStandaloneLab
             else if (e.Shift && e.KeyCode == Keys.F6) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaSheaf", _sfExe, "OmegaSheaf v0.2.1 GM"); }
             else if (e.KeyCode == Keys.F6 || (e.Shift && e.KeyCode == Keys.OemQuestion && ActiveControl != _txtGemmaIn)) OpenHumanManual();
             else if (e.Shift && e.KeyCode == Keys.F7) { e.SuppressKeyPress = true; ToggleOrLaunchBraidReHotkey(); }
-            else if (e.KeyCode == Keys.F7) LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.1.6 GM");
-            else if (e.Shift && e.KeyCode == Keys.F10) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM"); }
+            else if (e.KeyCode == Keys.F7) LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.2.0 GM");
+            else if (e.Shift && e.KeyCode == Keys.F10) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.2.0 GM"); }
             else if (e.KeyCode == Keys.F10) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaSynth", _syExe, "OmegaSynth v1.1.1 Final GM"); }
             else if (e.Shift && e.KeyCode == Keys.F11) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaConductor", _cdExe, "OmegaConductor v1.0.0 GM"); }
             else if (e.KeyCode == Keys.F11) { e.SuppressKeyPress = true; LaunchOrFocus("OmegaPenrose", _pnExe, "OmegaPenrose v1.0.2 Final GM"); }
@@ -1144,17 +1158,85 @@ namespace OmegaStandaloneLab
             else if (e.KeyCode == Keys.F8) _txtGemmaIn.Focus();
             else if (e.Shift && e.KeyCode == Keys.F9) { e.SuppressKeyPress = true; OmegaLabPixel10CockpitDialog.ShowOrFocus(this, _root); }
             else if (e.KeyCode == Keys.F9) SyncBridgeAsync();
-            else if (e.KeyCode == Keys.F12) { StopApps(new string[] { "OmegaBraidRE", "OmegaConductor", "OmegaTensor", "OmegaSonar", "OmegaSteg", "OmegaSheaf", "OmegaPenrose", "OmegaSynth", "OmegaShell", "OmegaForge", "OmegaAV", "OmegaBrowser", "OmegaMirror", "omega_p10_worker_host" }); StopPixel10WorkerAsync(); }
+            else if (e.KeyCode == Keys.F12) { StopApps(new string[] { "OmegaEngine", "OmegaBraidRE", "OmegaConductor", "OmegaTensor", "OmegaSonar", "OmegaSteg", "OmegaSheaf", "OmegaPenrose", "OmegaSynth", "OmegaShell", "OmegaForge", "OmegaAV", "OmegaBrowser", "OmegaMirror", "omega_p10_worker_host" }); StopPixel10WorkerAsync(); }
+        }
+
+                public static string ResolvePinnedSerialStatic(bool wantPixel8)
+        {
+            string raw = RunAdb("devices -l", 1600);
+            string[] lines = (raw ?? "").Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            List<string> all = new List<string>();
+            string p10 = "", p8 = "";
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string ln = lines[i].Trim();
+                if (ln.StartsWith("List of devices", StringComparison.OrdinalIgnoreCase) || ln.StartsWith("*", StringComparison.Ordinal)) continue;
+                string[] tk = ln.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (tk.Length < 2 || !string.Equals(tk[1], "device", StringComparison.OrdinalIgnoreCase)) continue;
+                string ser = tk[0].Trim();
+                all.Add(ser);
+                string low = ln.ToLowerInvariant();
+                if (low.Contains("3a121") || low.Contains("shiba") || low.Contains("pixel_8") || low.Contains("zuma")) p8 = ser;
+                else if (low.Contains("58170") || low.Contains("frankel") || low.Contains("pixel_10") || low.Contains("laguna")) p10 = ser;
+            }
+            if (wantPixel8) return p8;
+            if (!string.IsNullOrEmpty(p10)) return p10;
+            for (int i = 0; i < all.Count; i++) if (!string.Equals(all[i], p8, StringComparison.OrdinalIgnoreCase)) return all[i];
+            return "";
+        }
+
+        public static void QuickWakePixel8DaemonStatic()
+        {
+            if (Pixel10TensorBridge.ProbeDaemonHealth(19792, 350)) return;
+            string s8 = ResolvePinnedSerialStatic(true);
+            if (string.IsNullOrEmpty(s8)) return;
+            RunAdb("-s " + s8 + " forward tcp:19792 tcp:19792", 1400);
+            RunAdb("-s " + s8 + " forward tcp:22232 tcp:2222", 1400);
+            if (Pixel10TensorBridge.ProbeDaemonHealth(19792, 350)) return;
+            RunAdb("-s " + s8 + " shell \"if [ -x /data/local/tmp/omega_pocket_worker ]; then su -c 'killall -q omega_pocket_worker 2>/dev/null; /data/local/tmp/omega_pocket_worker --daemonize --stationary-boost --port 19792' 2>/dev/null || (/data/local/tmp/omega_pocket_worker --daemonize --port 19792); fi\"", 2600);
+        }
+
+        public static bool EnsureHostPort19793BridgedStatic(string suiteRoot)
+        {
+            string h0 = HttpGetFast("http://127.0.0.1:19793/api/health", 400);
+            if (!string.IsNullOrEmpty(h0) && h0.IndexOf("\"ok\":true", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            string s8 = ResolvePinnedSerialStatic(true);
+            if (!string.IsNullOrEmpty(s8))
+            {
+                RunAdb("-s " + s8 + " forward tcp:19793 tcp:19793", 1400);
+                RunAdb("-s " + s8 + " forward tcp:22232 tcp:2222", 1400);
+                string h1 = HttpGetFast("http://127.0.0.1:19793/api/health", 700);
+                if (!string.IsNullOrEmpty(h1) && h1.IndexOf("\"ok\":true", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                RunAdb("-s " + s8 + " forward --remove tcp:19793", 1200);
+            }
+            string sshExe = @"C:\Windows\System32\OpenSSH\ssh.exe";
+            string privKey = Path.Combine(suiteRoot, "10_omega_shell", "config", "ssh", "id_ed25519_omega");
+            string ban;
+            if (File.Exists(sshExe) && File.Exists(privKey) && Pixel10TensorBridge.ProbeSshBanner(22232, 180, out ban))
+            {
+                string khPath;
+                string ntfsPriv = StageLauncherNtfsKey(privKey, out khPath);
+                string tunArgs = "-i \"" + ntfsPriv + "\" -p 22232 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=\"" + khPath + "\" -o ConnectTimeout=4 -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -L 127.0.0.1:19793:127.0.0.1:19793 droid@127.0.0.1";
+                try
+                {
+                    ProcessStartInfo psi = new ProcessStartInfo(sshExe, tunArgs); psi.CreateNoWindow = true; psi.UseShellExecute = false;
+                    Process.Start(psi); Thread.Sleep(450);
+                    string h2 = HttpGetFast("http://127.0.0.1:19793/api/health", 700);
+                    if (!string.IsNullOrEmpty(h2) && h2.IndexOf("\"ok\":true", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                }
+                catch { }
+            }
+            return false;
         }
 
         public static void QuickWakePixel10DaemonStatic()
         {
             if (Pixel10TensorBridge.ProbeDaemonHealth(19788, 450)) return;
-            List<string> s = ListSerials();
-            if (s.Count == 0) return;
-            RunAdb("-s " + s[0] + " forward tcp:19788 tcp:19788", 1500);
+            string p10s = ResolvePinnedSerialStatic(false);
+            if (string.IsNullOrEmpty(p10s)) return;
+            RunAdb("-s " + p10s + " forward tcp:19788 tcp:19788", 1500);
             if (Pixel10TensorBridge.ProbeDaemonHealth(19788, 450)) return;
-            RunAdb("-s " + s[0] + " shell \"test -x /data/local/tmp/omega_p10_worker && (/data/local/tmp/omega_p10_worker --daemonize --port 19788)\"", 3000);
+            RunAdb("-s " + p10s + " shell \"test -x /data/local/tmp/omega_p10_worker && (/data/local/tmp/omega_p10_worker --daemonize --port 19788)\"", 3000);
             for (int i = 0; i < 8; i++)
             {
                 Thread.Sleep(220);
@@ -1316,7 +1398,7 @@ namespace OmegaStandaloneLab
                 RunAdb("-s " + ser + " push \"" + localSh + "\" /sdcard/Download/omega_debian_setup.sh", 5000);
                 RunAdb("-s " + ser + " push \"" + localSh + "\" /sdcard/Download/linux/omega_debian_setup.sh", 5000);
                 RunAdb("-s " + ser + " push \"" + pubPath + "\" /sdcard/Download/linux/id_ed25519_omega.pub", 4000);
-                RunAdb("-s " + ser + " forward tcp:22222 tcp:2222", 2000);
+                int locSsh = ser.StartsWith("3A121", StringComparison.OrdinalIgnoreCase) ? 22232 : 22222; RunAdb("-s " + ser + " forward tcp:" + locSsh + " tcp:2222", 2000);
             }
             return "[AVF READY] Granted MANAGE_EXTERNAL_STORAGE + staged Debian 13 setup.sh to /sdcard & /sdcard/Download + armed :22222 across " + sers.Count + " Pixel(s)!";
         }
@@ -1490,7 +1572,7 @@ namespace OmegaStandaloneLab
             List<string> sers = ListSerials();
             if (sers.Count > 0)
             {
-                RunAdb("-s " + sers[0] + " forward tcp:19789 tcp:19789", 1600);
+                string p10b = ResolvePinnedSerialStatic(false); if (!string.IsNullOrEmpty(p10b)) RunAdb("-s " + p10b + " forward tcp:19789 tcp:19789", 1600);
                 string h1 = HttpGetFast("http://127.0.0.1:19789/api/health", 750);
                 if (!string.IsNullOrEmpty(h1) && h1.IndexOf("\"ok\":true", StringComparison.OrdinalIgnoreCase) >= 0)
                     return true;
@@ -1584,7 +1666,7 @@ namespace OmegaStandaloneLab
             {
                 if (sers.Count > 0)
                 {
-                    string ser = sers[0];
+                    string p10Auto = ResolvePinnedSerialStatic(false); string ser = !string.IsNullOrEmpty(p10Auto) ? p10Auto : sers[0];
                     sb.AppendLine("    [AVF-AUTH] Authorizing Ed25519 key inside Pixel Terminal (/mnt/shared/ok.sh)...");
                     RunAdb("-s " + ser + " shell input keyevent 224", 2000);
                     RunAdb("-s " + ser + " shell wm dismiss-keyguard", 2000);
@@ -1706,7 +1788,7 @@ namespace OmegaStandaloneLab
         {
             List<string> sers = ListSerials();
             if (sers.Count == 0) return "[AVF Auto-Type] No ADB Pixel connected.";
-            string ser = sers[0];
+            string p10Auto = ResolvePinnedSerialStatic(false); string ser = !string.IsNullOrEmpty(p10Auto) ? p10Auto : sers[0];
 
             string sshDir = Path.Combine(suiteRoot, "10_omega_shell", "config", "ssh");
             Directory.CreateDirectory(sshDir);
@@ -1943,18 +2025,19 @@ namespace OmegaStandaloneLab
             m.Items.Add("07. OmegaPenrose Quasicrystal 8D (:19785) [F11]", null, delegate { LaunchOrFocus("OmegaPenrose", _pnExe, "OmegaPenrose v1.0.2 Final GM"); });
             m.Items.Add("08. OmegaSteg Air-Gap Security (:19786) [Shift+F8]", null, delegate { LaunchOrFocus("OmegaSteg", _sgExe, "OmegaSteg v0.2.1 (OmegaSec)"); });
             m.Items.Add("09. OmegaForge Toolchain + Supply Firewall (:19780) [F4]", null, delegate { LaunchOrFocus("OmegaForge", _fgExe, "OmegaForge v0.2.2"); });
-            m.Items.Add("10. OmegaShell Polyglot Studio + Sandbox (:19781) [F7]", null, delegate { LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.1.6 GM"); });
+            m.Items.Add("10. OmegaShell Polyglot Studio + Sandbox (:19781) [F7]", null, delegate { LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.2.0 GM"); });
             m.Items.Add("11. Pixel 10 Tensor + EdgeTPU Cockpit (:19788) [Shift+F9]", null, delegate { OmegaLabPixel10CockpitDialog.ShowOrFocus(this, _root); });
             m.Items.Add("12. OmegaConductor 6-DoF Wand Bus (:19790) [Shift+F11]", null, delegate { LaunchOrFocus("OmegaConductor", _cdExe, "OmegaConductor v1.0.0 GM"); });
-            m.Items.Add("13. OmegaTensor 5-Engine Split + Pocket (:19791) [Shift+F10]", null, delegate { LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM"); });
+            m.Items.Add("13. OmegaTensor 7-Tier Dual-Pixel Split (:19791) [Shift+F10]", null, delegate { LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.2.0 GM"); });
             m.Items.Add("14. OmegaBraidRE v1.4.0 Lifter + DLL/AOB (:19794) [Shift+F7]", null, delegate { LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.4.0 GM"); });
+            m.Items.Add("15. OmegaEngine v1.7.7 3D DirectCompute Arena + ReShade .fx (:19795) [Shift+F3]", null, delegate { LaunchOrFocus("OmegaEngine", _enExe, "OmegaEngine v1.7.7 GM"); });
             m.Items.Add(new ToolStripSeparator());
             m.Items.Add("R&D Sub-Mode :: Zero-Crate CAS Vault Drawer (Track 03)", null, delegate { LaunchStationWithArgs(_sgExe, "--vault", "OmegaVault CAS Drawer"); });
             m.Items.Add("R&D Sub-Mode :: Skyrim/FO4 Sheaf ModSurgeon (Track 05)", null, delegate { LaunchStationWithArgs(_sfExe, "--surgeon", "OmegaSheaf ModSurgeon"); });
             m.Items.Add("R&D Sub-Mode :: Unified Hardware Config & Chaos Harness", null, delegate { using (OmegaUnifiedChaosAndConfigDialog dlg = new OmegaUnifiedChaosAndConfigDialog()) dlg.ShowDialog(this); });
             m.Items.Add(new ToolStripSeparator());
-            m.Items.Add("Launch All 14 Stations Simultaneously [F5]", null, delegate { LaunchFullSuite(); });
-            m.Items.Add("Stop All Child Stations + Free GPU/RAM [F12]", null, delegate { StopApps(new string[] { "OmegaBraidRE", "OmegaConductor", "OmegaTensor", "OmegaSonar", "OmegaSteg", "OmegaSheaf", "OmegaPenrose", "OmegaSynth", "OmegaShell", "OmegaForge", "OmegaAV", "OmegaBrowser", "OmegaMirror", "omega_p10_worker_host" }); StopPixel10WorkerAsync(); });
+            m.Items.Add("Launch All 15 Stations Simultaneously [F5]", null, delegate { LaunchFullSuite(); });
+            m.Items.Add("Stop All Child Stations + Free GPU/RAM [F12]", null, delegate { StopApps(new string[] { "OmegaEngine", "OmegaBraidRE", "OmegaConductor", "OmegaTensor", "OmegaSonar", "OmegaSteg", "OmegaSheaf", "OmegaPenrose", "OmegaSynth", "OmegaShell", "OmegaForge", "OmegaAV", "OmegaBrowser", "OmegaMirror", "omega_p10_worker_host" }); StopPixel10WorkerAsync(); });
             m.Items.Add("Clean Desktop Icons -> Single 'Omega Unified Lab' Icon", null, delegate { ConsolidateDesktopShortcutsAsync(); });
             return m;
         }
@@ -2018,16 +2101,17 @@ namespace OmegaStandaloneLab
                         LaunchOrFocus("OmegaMirror", _mrExe, "OmegaMirror v0.9");
                         LaunchOrFocus("OmegaAV", _avExe, "OmegaAV v0.7.5");
                         LaunchOrFocus("OmegaForge", _fgExe, "OmegaForge v0.2.1");
-                        LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.1.6 GM");
+                        LaunchOrFocus("OmegaShell", _shExe, "OmegaShell v1.2.0 GM");
                         LaunchOrFocus("OmegaSynth", _syExe, "OmegaSynth v1.1.1 Final GM");
                         LaunchOrFocus("OmegaSonar", _snExe, "OmegaSonar v1.1.0 GM");
                         LaunchOrFocus("OmegaPenrose", _pnExe, "OmegaPenrose v1.0.2 Final GM");
                         LaunchOrFocus("OmegaSheaf", _sfExe, "OmegaSheaf v0.2.2 GM");
                         LaunchOrFocus("OmegaSteg", _sgExe, "OmegaSteg v0.2.1 (OmegaSec)");
                         LaunchOrFocus("OmegaConductor", _cdExe, "OmegaConductor v1.0.0 GM");
-                        LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.0.2 GM");
+                        LaunchOrFocus("OmegaTensor", _tnExe, "OmegaTensor v1.2.0 GM");
                         LaunchOrFocus("OmegaBraidRE", _reExe, "OmegaBraidRE v1.4.0 GM");
-                        SetAct("Full 14-Station Suite v3.0.10 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) across " + n + " Pixel(s)!");
+                        LaunchOrFocus("OmegaEngine", _enExe, "OmegaEngine v1.7.7 GM");
+                        SetAct("Full 15-Station Suite v3.7.1 LIVE | Conductor (:19790) + Tensor (:19791) + BraidRE (:19794) + Engine (:19795) across " + n + " Pixel(s)!");
                     });
                 }
                 catch { }
@@ -2060,14 +2144,15 @@ namespace OmegaStandaloneLab
             m.Items.Add("Vault Downloads (Papers, Audio, Shaders, Models)", null, delegate { OpenDir(_dlDir); });
             m.Items.Add("Pixel 10 10-Kernel Tensor Cockpit (:19788 Live Inspector)", null, delegate { OmegaLabPixel10CockpitDialog.ShowOrFocus(this, _root); });
             m.Items.Add("Pixel 10 Rust+Vulkan Worker Dir (11_omega_edge_workers\\rust_p10_worker)", null, delegate { OpenDir(_p10Dir); });
-            m.Items.Add("OmegaShell v1.1.6 GM Cloud CAS Vault", null, delegate { OpenDir(Path.Combine(_shDir, "cloud_cas")); });
-            m.Items.Add("OmegaShell v1.1.6 GM Workspace Builds (Gemma Codegen)", null, delegate { OpenDir(Path.Combine(_shDir, "workspace_builds")); });
+            m.Items.Add("OmegaShell v1.2.0 GM Cloud CAS Vault", null, delegate { OpenDir(Path.Combine(_shDir, "cloud_cas")); });
+            m.Items.Add("OmegaShell v1.2.0 GM Workspace Builds (Gemma Codegen)", null, delegate { OpenDir(Path.Combine(_shDir, "workspace_builds")); });
             m.Items.Add("OmegaForge v0.2.1 Workspace (Compiled Binaries & Lean 4 Proofs)", null, delegate { OpenDir(Path.Combine(_fgDir, "workspace")); });
             m.Items.Add("Corpus Vault (Markdown + JSONL Shards)", null, delegate { OpenDir(Directory.Exists((Environment.GetEnvironmentVariable("OMEGA_CORPUS_DIR") ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\'), "corpus"))) ? (Environment.GetEnvironmentVariable("OMEGA_CORPUS_DIR") ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\'), "corpus")) : Path.Combine(_brDir, "corpus")); });
             m.Items.Add("OmegaAV v0.7.5 Renders (1080p/4K MP4, AVI & PNGs)", null, delegate { OpenDir(Path.Combine(_avDir, "renders")); });
             m.Items.Add("OmegaSynth v1.1.1 Final GM Renders (48kHz Stereo .WAV)", null, delegate { OpenDir(Path.Combine(_syDir, "renders")); });
-            m.Items.Add("OmegaTensor v1.0.2 GM Split-Inference Snapshots & Stress Logs", null, delegate { OpenDir(Path.Combine(_tnDir, "exports")); });
+            m.Items.Add("OmegaTensor v1.2.0 GM Split-Inference Snapshots & Stress Logs", null, delegate { OpenDir(Path.Combine(_tnDir, "exports")); });
             m.Items.Add("OmegaBraidRE v1.4.0 Recovered #[repr(C)] / C++23 / AOB Exports (:19794)", null, delegate { OpenDir(Path.Combine(_dlDir, "omega_braid_re_exports")); });
+            m.Items.Add("OmegaEngine v1.7.7 ReShade .fx & .addon64 Exports (:19795)", null, delegate { OpenDir(Path.Combine(_dlDir, "omega_engine_exports")); });
             m.Items.Add("OmegaSonar v1.1.0 GM Radar Snapshots & Stress Logs", null, delegate { OpenDir(Path.Combine(_snDir, "exports")); });
             m.Items.Add("OmegaPenrose v1.0.2 Final GM Exports (.STL, .OBJ, Citadel, .AVI, .SVG)", null, delegate { OpenDir(Path.Combine(_pnDir, "exports")); });
             m.Items.Add("OmegaPenrose v1.0.2 Final GM Patch Bank (.openrose)", null, delegate { OpenDir(Path.Combine(_pnDir, "patches")); });
@@ -2148,7 +2233,7 @@ namespace OmegaStandaloneLab
 
         private void SyncBridgeAsync()
         {
-            SetAct("Exporting Suite v2.3.2 + Pixel 10 10-Kernel Tensor + OmegaShell v1.1.6 GM + Manifest -> OMEGA_BRIDGE_EXPORT...");
+            SetAct("Exporting Suite v2.3.2 + Pixel 10 10-Kernel Tensor + OmegaShell v1.2.0 GM + Manifest -> OMEGA_BRIDGE_EXPORT...");
             ThreadPool.QueueUserWorkItem(delegate { SetAct(ExecuteSuiteBridgeSync(_root)); RefreshAsync(); });
         }
 
@@ -2196,6 +2281,7 @@ namespace OmegaStandaloneLab
                 CopyAll(shD, Path.Combine(dst, "10_omega_shell"), new string[] { "*.cs", "*.exe" });
                 CopyAll(tnD, Path.Combine(dst, "13_omega_tensor"), new string[] { "*.cs", "*.exe" });
                 CopyAll(Path.Combine(root, "14_omega_braid_re"), Path.Combine(dst, "14_omega_braid_re"), new string[] { "*.cs", "*.exe" });
+                CopyAll(Path.Combine(root, "15_omega_engine"), Path.Combine(dst, "15_omega_engine"), new string[] { "*.cs", "*.exe" });
                 string p10D = Path.Combine(root, "11_omega_edge_workers\\rust_p10_worker");
                 CopyAll(p10D, Path.Combine(dst, "11_omega_edge_workers\\rust_p10_worker"), new string[] { "*.toml", "*.ps1" });
                 CopyAll(Path.Combine(p10D, "src"), Path.Combine(dst, "11_omega_edge_workers\\rust_p10_worker", "src"), new string[] { "*.rs" });
@@ -2391,10 +2477,24 @@ namespace OmegaStandaloneLab
                 RunAdb("-s " + s[i] + " reverse tcp:19790 tcp:19790", 1400);
                 RunAdb("-s " + s[i] + " reverse tcp:19791 tcp:19791", 1400);
                 RunAdb("-s " + s[i] + " reverse tcp:19794 tcp:19794", 1400);
-                RunAdb("-s " + s[i] + " forward tcp:19788 tcp:19788", 1400);
-                RunAdb("-s " + s[i] + " forward tcp:22222 tcp:2222", 1400);
-                EnsureHostPort19789BridgedStatic(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'));
-                RunAdb("-s " + s[i] + " forward tcp:28022 tcp:8022", 1400);
+                RunAdb("-s " + s[i] + " reverse tcp:19795 tcp:19795", 1400);
+                bool isP8 = s[i].StartsWith("3A121", StringComparison.OrdinalIgnoreCase) || string.Equals(s[i], ResolvePinnedSerialStatic(true), StringComparison.OrdinalIgnoreCase);
+                if (isP8)
+                {
+                    RunAdb("-s " + s[i] + " forward --remove tcp:19790", 1000);
+                    RunAdb("-s " + s[i] + " forward --remove tcp:19791", 1000);
+                    RunAdb("-s " + s[i] + " forward tcp:19792 tcp:19792", 1400);
+                    RunAdb("-s " + s[i] + " forward tcp:22232 tcp:2222", 1400);
+                    EnsureHostPort19793BridgedStatic(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'));
+                    RunAdb("-s " + s[i] + " forward tcp:28032 tcp:8022", 1400);
+                }
+                else
+                {
+                    RunAdb("-s " + s[i] + " forward tcp:19788 tcp:19788", 1400);
+                    RunAdb("-s " + s[i] + " forward tcp:22222 tcp:2222", 1400);
+                    EnsureHostPort19789BridgedStatic(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'));
+                    RunAdb("-s " + s[i] + " forward tcp:28022 tcp:8022", 1400);
+                }
             }
             return s.Count;
         }
@@ -2457,20 +2557,20 @@ namespace OmegaStandaloneLab
                 try
                 {
                     bool brOn, mrOn, avOn, syOn, sfOn, pnOn, sgOn, fgOn, shOn;
-                    bool snOn, cdOn, tnOn, reOn; long snMb = GetRamMb("OmegaSonar", out snOn), cdMb = GetRamMb("OmegaConductor", out cdOn), tnMb = GetRamMb("OmegaTensor", out tnOn), reMb = GetRamMb("OmegaBraidRE", out reOn); long brMb = GetRamMb("OmegaBrowser", out brOn), mrMb = GetRamMb("OmegaMirror", out mrOn), avMb = GetRamMb("OmegaAV", out avOn), syMb = GetRamMb("OmegaSynth", out syOn), sfMb = GetRamMb("OmegaSheaf", out sfOn), pnMb = GetRamMb("OmegaPenrose", out pnOn), sgMb = GetRamMb("OmegaSteg", out sgOn), fgMb = GetRamMb("OmegaForge", out fgOn), shMb = GetRamMb("OmegaShell", out shOn);
+                    bool snOn, cdOn, tnOn, reOn, enOn; long snMb = GetRamMb("OmegaSonar", out snOn), cdMb = GetRamMb("OmegaConductor", out cdOn), tnMb = GetRamMb("OmegaTensor", out tnOn), reMb = GetRamMb("OmegaBraidRE", out reOn), enMb = GetRamMb("OmegaEngine", out enOn); long brMb = GetRamMb("OmegaBrowser", out brOn), mrMb = GetRamMb("OmegaMirror", out mrOn), avMb = GetRamMb("OmegaAV", out avOn), syMb = GetRamMb("OmegaSynth", out syOn), sfMb = GetRamMb("OmegaSheaf", out sfOn), pnMb = GetRamMb("OmegaPenrose", out pnOn), sgMb = GetRamMb("OmegaSteg", out sgOn), fgMb = GetRamMb("OmegaForge", out fgOn), shMb = GetRamMb("OmegaShell", out shOn);
                     bool gmOn = ProbePort(8097) || ProbePort(11434);
                     string brT = "Browser (:9778): " + (brOn ? ("ONLINE (" + brMb + " MB)") : "OFFLINE");
                     string mrT = "Mirror (:19777): " + (mrOn ? ("ONLINE (" + mrMb + " MB)") : "OFFLINE");
-                    string avT = "AV:" + (avOn ? "ON" : "--") + " Sy:" + (syOn ? "ON" : "--") + " Sn:" + (snOn ? "ON" : "--") + " Cd:" + (cdOn ? "ON" : "--") + " Tn:" + (tnOn ? "ON" : "--") + " Re:" + (reOn ? "ON" : "--") + " Sf:" + (sfOn ? "ON" : "--") + " Pn:" + (pnOn ? "ON" : "--") + " Sg:" + (sgOn ? "ON" : "--");
-                    string ramT = "Forge:" + (fgOn ? "ON" : "--") + " | Shell:" + (shOn ? "ON" : "--") + " | Gemma:" + (gmOn ? "ON" : "--") + " | " + (brMb + mrMb + avMb + syMb + snMb + cdMb + tnMb + reMb + sfMb + pnMb + sgMb + fgMb + shMb) + " MB";
+                    string avT = "AV:" + (avOn ? "ON" : "--") + " Sy:" + (syOn ? "ON" : "--") + " Sn:" + (snOn ? "ON" : "--") + " Cd:" + (cdOn ? "ON" : "--") + " Tn:" + (tnOn ? "ON" : "--") + " Re:" + (reOn ? "ON" : "--") + " En:" + (enOn ? "ON" : "--") + " Sf:" + (sfOn ? "ON" : "--") + " Pn:" + (pnOn ? "ON" : "--") + " Sg:" + (sgOn ? "ON" : "--");
+                    string ramT = "Forge:" + (fgOn ? "ON" : "--") + " | Shell:" + (shOn ? "ON" : "--") + " | Gemma:" + (gmOn ? "ON" : "--") + " | " + (brMb + mrMb + avMb + syMb + snMb + cdMb + tnMb + reMb + enMb + sfMb + pnMb + sgMb + fgMb + shMb) + " MB";
 
                     List<string> raw = ListSerials(), dv = new List<string>();
                     for (int i = 0; i < raw.Count; i++) dv.Add(raw[i].Contains(":") ? ("WiFi:" + raw[i].Split(':')[0]) : ("USB:" + (raw[i].Length > 8 ? raw[i].Substring(0, 6) : raw[i])));
                     bool p10Wk = Pixel10TensorBridge.ProbeDaemonHealth(19788, 1200);
                     if (!p10Wk && raw.Count > 0 && (_p10PollTick % 4) == 0)
                     {
-                        RunAdb("-s " + raw[0] + " forward tcp:19788 tcp:19788", 1200);
-                        RunAdb("-s " + raw[0] + " shell \"test -x /data/local/tmp/omega_p10_worker && /data/local/tmp/omega_p10_worker --daemonize --port 19788\"", 2200);
+                        QuickWakePixel10DaemonStatic();
+                        QuickWakePixel8DaemonStatic();
                         p10Wk = Pixel10TensorBridge.ProbeDaemonHealth(19788, 900);
                     }
                     bool avfGpuWk = Pixel10TensorBridge.ProbeDaemonHealth(19789, 1000);
@@ -2578,7 +2678,7 @@ namespace OmegaStandaloneLab
                 if (a == "--avf-autotype") { Console.WriteLine(ExecuteZeroMountAvfAutoTypeStatic(r)); return; }
                 if (a == "--avf-rust-bench" || a == "--avf-daemon-deploy") { Console.WriteLine(ExecuteAvfNativeRustBenchStatic(r)); return; }
                 if (a == "--avf-dispatch-udot") { EnsureHostPort19789BridgedStatic(r); Console.WriteLine(HttpGetFast("http://127.0.0.1:19789/api/dispatch/udot", 15000)); return; }
-                if (a == "--make-icons") { MakeIco(Path.Combine(r, "icons", "omega_lab.ico"), 56, 189, 248, "O1"); MakeIco(Path.Combine(r, "icons", "omega_browser.ico"), 2, 132, 199, "BR"); MakeIco(Path.Combine(r, "icons", "omega_mirror.ico"), 15, 118, 110, "MR"); MakeIco(Path.Combine(r, "icons", "omega_av.ico"), 168, 85, 247, "AV"); MakeIco(Path.Combine(r, "icons", "omega_forge.ico"), 16, 185, 129, "OF"); MakeIco(Path.Combine(r, "icons", "omega_shell.ico"), 14, 165, 233, "OS"); MakeIco(Path.Combine(r, "icons", "omega_synth.ico"), 236, 72, 153, "SY"); MakeIco(Path.Combine(r, "icons", "omega_sonar.ico"), 6, 148, 162, "SN"); MakeIco(Path.Combine(r, "icons", "omega_penrose.ico"), 20, 184, 166, "PN"); MakeIco(Path.Combine(r, "icons", "omega_sheaf.ico"), 16, 185, 129, "SF"); MakeIco(Path.Combine(r, "icons", "omega_steg.ico"), 245, 158, 11, "SG"); MakeIco(Path.Combine(r, "icons", "omega_conductor.ico"), 13, 148, 136, "CD"); MakeIco(Path.Combine(r, "icons", "omega_tensor.ico"), 124, 58, 237, "TN"); MakeIco(Path.Combine(r, "icons", "omega_braid_re.ico"), 14, 116, 144, "RE"); return; }
+                if (a == "--make-icons") { MakeIco(Path.Combine(r, "icons", "omega_lab.ico"), 56, 189, 248, "O1"); MakeIco(Path.Combine(r, "icons", "omega_browser.ico"), 2, 132, 199, "BR"); MakeIco(Path.Combine(r, "icons", "omega_mirror.ico"), 15, 118, 110, "MR"); MakeIco(Path.Combine(r, "icons", "omega_av.ico"), 168, 85, 247, "AV"); MakeIco(Path.Combine(r, "icons", "omega_forge.ico"), 16, 185, 129, "OF"); MakeIco(Path.Combine(r, "icons", "omega_shell.ico"), 14, 165, 233, "OS"); MakeIco(Path.Combine(r, "icons", "omega_synth.ico"), 236, 72, 153, "SY"); MakeIco(Path.Combine(r, "icons", "omega_sonar.ico"), 6, 148, 162, "SN"); MakeIco(Path.Combine(r, "icons", "omega_penrose.ico"), 20, 184, 166, "PN"); MakeIco(Path.Combine(r, "icons", "omega_sheaf.ico"), 16, 185, 129, "SF"); MakeIco(Path.Combine(r, "icons", "omega_steg.ico"), 245, 158, 11, "SG"); MakeIco(Path.Combine(r, "icons", "omega_conductor.ico"), 13, 148, 136, "CD"); MakeIco(Path.Combine(r, "icons", "omega_tensor.ico"), 124, 58, 237, "TN"); MakeIco(Path.Combine(r, "icons", "omega_braid_re.ico"), 14, 116, 144, "RE"); MakeIco(Path.Combine(r, "icons", "omega_engine.ico"), 2, 132, 199, "EN"); return; }
             }
             string diagLog = Path.Combine(r, "workspace", "launcher_startup.log");
             try

@@ -20,8 +20,8 @@ function Sync-SingleUnifiedDesktopShortcut {
     $CanonicalPath = Join-Path $DesktopDir $CanonicalName
     $ArchivedCount = 0
 
-    $StationExePattern = "(OmegaLabLauncher|OmegaMirror|OmegaBrowser|OmegaAV|OmegaSynth|OmegaSonar|OmegaSheaf|OmegaPenrose|OmegaSteg|OmegaForge|OmegaShell|OmegaConductor|OmegaTensor|OmegaBraidRE|OmegaWorkbench|OmegaPocket|OmegaVault|OmegaSpatial|OmegaRnD)"
-    $LegacyNamePattern = "^(Omega\s*(Mirror|Browser|AV|Synth|Sonar|Sheaf|Penrose|Steg|Forge|Shell|Conductor|Tensor|BraidRE|Workbench|Pocket|Vault|Spatial|Standalone|RnD|R&D\s+Lab)|ACT-Omega\s+Lab\b)"
+    $StationExePattern = "(OmegaLabLauncher|OmegaMirror|OmegaBrowser|OmegaAV|OmegaSynth|OmegaSonar|OmegaSheaf|OmegaPenrose|OmegaSteg|OmegaForge|OmegaShell|OmegaConductor|OmegaTensor|OmegaBraidRE|OmegaEngine|OmegaWorkbench|OmegaPocket|OmegaVault|OmegaSpatial|OmegaRnD)"
+    $LegacyNamePattern = "^(Omega\s*(Mirror|Browser|AV|Synth|Sonar|Sheaf|Penrose|Steg|Forge|Shell|Conductor|Tensor|BraidRE|Engine|Workbench|Pocket|Vault|Spatial|Standalone|RnD|R&D\s+Lab)|ACT-Omega\s+Lab\b)"
 
     $ScanDirs = @($DesktopDir, (Join-Path $env:USERPROFILE "Desktop"), [Environment]::GetFolderPath("CommonDesktopDirectory")) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
     $DesktopLinks = @()
@@ -54,7 +54,7 @@ function Sync-SingleUnifiedDesktopShortcut {
     $Lnk.WorkingDirectory = $RootDir
     $Ico = Join-Path $IconDir "omega_lab.ico"
     if (Test-Path -LiteralPath $Ico) { $Lnk.IconLocation = $Ico }
-    $Lnk.Description = "Omega Unified Lab (Single Launcher for All 14 Stations & R&D Sub-Modes)"
+    $Lnk.Description = "Omega Unified Lab (Single Launcher for All 15 Stations & R&D Sub-Modes)"
     $Lnk.Save()
     Write-Host ("  [DESKTOP CLEAN] Single shortcut active: '{0}' (archived {1} redundant .lnk icons -> workspace\archived_desktop_shortcuts)" -f $CanonicalName, $ArchivedCount) -ForegroundColor Green
 }
@@ -76,20 +76,21 @@ if (-not (Test-Path $Csc)) {
 }
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host " OMEGA UNIFIED LABS v3.0.10 :: ZERO-NUGET 15-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
+Write-Host " OMEGA UNIFIED LABS v3.7.1 :: ZERO-NUGET 16-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # Stop any running station binaries before recompiling in place
 $StationNames = @(
     "OmegaLabLauncher","OmegaMirror","OmegaBrowser","OmegaAV","OmegaSynth",
     "OmegaSonar","OmegaSheaf","OmegaPenrose","OmegaSteg","OmegaForge",
-    "OmegaShell","OmegaConductor","OmegaTensor","OmegaBraidRE"
+    "OmegaShell","OmegaConductor","OmegaTensor","OmegaBraidRE","OmegaEngine"
 )
 foreach ($sn in $StationNames) {
     Get-Process -Name $sn -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
 $CommonCfg = Join-Path $RepoRoot "common\OmegaHardwareConfig.cs"
+$CommonTriBus = Join-Path $RepoRoot "common\OmegaTriEngineSharedBus.cs"
 $RndDir    = Join-Path $RepoRoot "common\rnd_fused"
 $IconsDir  = Join-Path $RepoRoot "icons"
 New-Item -ItemType Directory -Force -Path $IconsDir | Out-Null
@@ -160,7 +161,7 @@ function Find-WebView2Dlls {
 
 $FailCount = 0
 
-# 00. Build OmegaLabLauncher first so --make-icons generates all 14 procedural .ico assets on fresh clones!
+# 00. Build OmegaLabLauncher first so --make-icons generates all 15 procedural .ico assets on fresh clones!
 $LauncherExe = Join-Path $RepoRoot "OmegaLabLauncher.exe"
 $LauncherSrc = @(
     $CommonCfg,
@@ -206,12 +207,12 @@ if (Find-WebView2Dlls -BrowserDir $BrDir) {
 
 # 03. OmegaAV (:19779)
 $AvDir = Join-Path $RepoRoot "03_omega_av"
-$AvSrc = @($CommonCfg) + @(Get-ChildItem -Path $AvDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
+$AvSrc = @($CommonCfg, $CommonTriBus) + @(Get-ChildItem -Path $AvDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "03. OmegaAV (:19779)" (Join-Path $AvDir "OmegaAV.exe") (Join-Path $IconsDir "omega_av.ico") @() $AvSrc)) { $FailCount++ }
 
 # 04. OmegaSynth (:19782 + Fused Track #04 Spatial Rig)
 $SyDir = Join-Path $RepoRoot "04_omega_synth"
-$SySrc = @($CommonCfg, (Join-Path $RndDir "OmegaSpatialCore.cs"), (Join-Path $RndDir "OmegaSpatialStressSuite.cs")) + @(Get-ChildItem -Path $SyDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
+$SySrc = @($CommonCfg, $CommonTriBus, (Join-Path $RndDir "OmegaSpatialCore.cs"), (Join-Path $RndDir "OmegaSpatialStressSuite.cs")) + @(Get-ChildItem -Path $SyDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "04. OmegaSynth (:19782 + Spatial)" (Join-Path $SyDir "OmegaSynth.exe") (Join-Path $IconsDir "omega_synth.ico") @() $SySrc)) { $FailCount++ }
 
 # 05. OmegaSonar (:19783 + Fused Golay-64)
@@ -226,7 +227,7 @@ if (-not (Invoke-StationBuild "06. OmegaSheaf (:19784 + Surgeon)" (Join-Path $Sf
 
 # 07. OmegaPenrose (:19785)
 $PnDir = Join-Path $RepoRoot "07_omega_penrose"
-$PnSrc = @($CommonCfg) + @(Get-ChildItem -Path $PnDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
+$PnSrc = @($CommonCfg, $CommonTriBus) + @(Get-ChildItem -Path $PnDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "07. OmegaPenrose (:19785)" (Join-Path $PnDir "OmegaPenrose.exe") (Join-Path $IconsDir "omega_penrose.ico") @() $PnSrc)) { $FailCount++ }
 
 # 08. OmegaSteg (:19786 + Fused Track #03 Zero-Crate CAS Vault & CRDT)
@@ -244,6 +245,22 @@ $ShDir = Join-Path $RepoRoot "10_omega_shell"
 $ShSrc = @($CommonCfg, (Join-Path $RndDir "OmegaWorkbenchEngines.cs"), (Join-Path $RndDir "OmegaWorkbenchStressSuite.cs")) + @(Get-ChildItem -Path $ShDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "10. OmegaShell (:19781 + JobReaper)" (Join-Path $ShDir "OmegaShell.exe") (Join-Path $IconsDir "omega_shell.ico") @("System.Data.dll","System.Xml.dll","System.ServiceProcess.dll","System.IO.Compression.dll") $ShSrc)) { $FailCount++ }
 
+# Auto-build 11_omega_edge_workers\rust_p10_worker\bin\omega_p10_worker_host.exe so Host Companion is always ready!
+$P10HostDir = Join-Path $RepoRoot "11_omega_edge_workers\rust_p10_worker"
+$P10HostBin = Join-Path $P10HostDir "bin\omega_p10_worker_host.exe"
+if ((-not $SkipRust) -and (-not (Test-Path $P10HostBin)) -and (Test-Path (Join-Path $P10HostDir "src\main.rs"))) {
+    $RcCmd = Get-Command "rustc.exe" -ErrorAction SilentlyContinue
+    $RcExe = if ($RcCmd) { $RcCmd.Source } elseif (Test-Path "$env:USERPROFILE\.cargo\bin\rustc.exe") { "$env:USERPROFILE\.cargo\bin\rustc.exe" } else { "" }
+    if ($RcExe -ne "") {
+        New-Item -ItemType Directory -Force -Path (Join-Path $P10HostDir "bin") | Out-Null
+        & $RcExe --edition 2021 -C opt-level=3 (Join-Path $P10HostDir "src\main.rs") -o $P10HostBin | Out-Host
+        if (Test-Path $P10HostBin) {
+            $hkb = [Math]::Round(((Get-Item $P10HostBin).Length / 1024.0), 1)
+            Write-Host ("  [PASS] 11. omega_p10_worker_host.exe (Host RTX)  -> {0,7} KB" -f $hkb) -ForegroundColor Green
+        }
+    }
+}
+
 # 12. OmegaConductor (:19790 + Fused Binary OSC / 14-bit MPE)
 $CdDir = Join-Path $RepoRoot "12_omega_conductor"
 $CdSrc = @($CommonCfg, (Join-Path $RndDir "OmegaSpatialCore.cs")) + @(Get-ChildItem -Path $CdDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
@@ -251,7 +268,7 @@ if (-not (Invoke-StationBuild "12. OmegaConductor (:19790 + OSC)" (Join-Path $Cd
 
 # 13. OmegaTensor (:19791 + Fused Track #02 Pocket+PC Silicon Fusion & /v1/chat/completions)
 $TnDir = Join-Path $RepoRoot "13_omega_tensor"
-$TnSrc = @($CommonCfg, (Join-Path $RndDir "OmegaPocketCore.cs"), (Join-Path $RndDir "OmegaPocketStressSuite.cs")) + @(Get-ChildItem -Path $TnDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
+$TnSrc = @($CommonCfg, $CommonTriBus, (Join-Path $RndDir "OmegaPocketCore.cs"), (Join-Path $RndDir "OmegaPocketStressSuite.cs")) + @(Get-ChildItem -Path $TnDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "13. OmegaTensor (:19791 + OpenAI v1)" (Join-Path $TnDir "OmegaTensor.exe") (Join-Path $IconsDir "omega_tensor.ico") @() $TnSrc)) { $FailCount++ }
 
 # 14. OmegaBraidRE (:19794 Zero-Crate PE .pdata / IAT / EAT / RIP / ECMA-335 #~ CIL Lifter & E8 Differ)
@@ -259,13 +276,34 @@ $ReDir = Join-Path $RepoRoot "14_omega_braid_re"
 $ReSrc = @($CommonCfg) + @(Get-ChildItem -Path $ReDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "14. OmegaBraidRE (:19794 Lifter+Differ)" (Join-Path $ReDir "OmegaBraidRE.exe") (Join-Path $IconsDir "omega_braid_re.ico") @() $ReSrc)) { $FailCount++ }
 
+# 15. OmegaEngine (:19795 Standalone 3D DirectCompute Arena + 320B Seqlock + ReShade .fx Bridge)
+$EnDir = Join-Path $RepoRoot "15_omega_engine"
+$EnAddonOut = Join-Path $EnDir "exports\OmegaTriEngine.addon64"
+if ((-not (Test-Path $EnAddonOut)) -and (Test-Path (Join-Path $EnDir "reshade_addon\Cargo.toml"))) {
+    $Cgo = Get-Command "cargo.exe" -ErrorAction SilentlyContinue
+    if ($Cgo) {
+        Push-Location (Join-Path $EnDir "reshade_addon")
+        try { & $Cgo.Source build --release --quiet | Out-Host } finally { Pop-Location }
+        $BuiltA = Join-Path $EnDir "reshade_addonarget
+elease\omega_tri_engine_addon.dll"
+        if (Test-Path $BuiltA) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $EnAddonOut) | Out-Null
+            Copy-Item $BuiltA -Destination $EnAddonOut -Force
+        }
+    }
+}
+$EnSrc = @($CommonCfg, $CommonTriBus) + @(Get-ChildItem -Path $EnDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
+if (-not (Invoke-StationBuild "15. OmegaEngine (:19795 3D Tri-Engine)" (Join-Path $EnDir "OmegaEngine.exe") (Join-Path $IconsDir "omega_engine.ico") @() $EnSrc)) { $FailCount++ }
+
 # Optional Rust #![no_std] Zero-Crate Invariant Suites (00_core_rust_audit + 14_omega_braid_re\rust_braid_re_core)
 if (-not $SkipRust) {
     $CargoCmd = Get-Command "cargo.exe" -ErrorAction SilentlyContinue
     if ($CargoCmd) {
         $RustSuites = @(
             @("00_core_rust_audit", (Join-Path $RepoRoot "00_core_rust_audit"), "10/10"),
-            @("omega_braid_re_core", (Join-Path $ReDir "rust_braid_re_core"), "9/9")
+            @("omega_braid_re_core", (Join-Path $ReDir "rust_braid_re_core"), "9/9"),
+            @("omega_tri_engine_core", (Join-Path $EnDir "rust_tri_engine_core"), "8/8"),
+            @("omega_skyrim_world_bridge_core", (Join-Path $EnDir "rust_skse64_core"), "9/9")
         )
         foreach ($rs in $RustSuites) {
             if (Test-Path $rs[1]) {
@@ -296,7 +334,7 @@ if ($FailCount -gt 0) {
 
 # Optional Headless Stress-Suite Verification (All 12 Audited Binaries!)
 if ($RunStressSuites) {
-    Write-Host ">>> Running Headless Stress Suites Across All 12 Audited Stations..." -ForegroundColor Magenta
+    Write-Host ">>> Running Headless Stress Suites Across All 13 Audited Stations..." -ForegroundColor Magenta
     $StressTargets = @(
         @("OmegaLabLauncher (:19800 Chaos)", $LauncherExe),
         @("01. OmegaMirror", (Join-Path $MirrorDir "OmegaMirror.exe")),
@@ -309,7 +347,8 @@ if ($RunStressSuites) {
         @("10. OmegaShell+Sandbox", (Join-Path $ShDir "OmegaShell.exe")),
         @("12. OmegaConductor", (Join-Path $CdDir "OmegaConductor.exe")),
         @("13. OmegaTensor+Pocket", (Join-Path $TnDir "OmegaTensor.exe")),
-        @("14. OmegaBraidRE", (Join-Path $ReDir "OmegaBraidRE.exe"))
+        @("14. OmegaBraidRE", (Join-Path $ReDir "OmegaBraidRE.exe")),
+        @("15. OmegaEngine 3D", (Join-Path $EnDir "OmegaEngine.exe"))
     )
     foreach ($st in $StressTargets) {
         $lbl = $st[0]
@@ -356,4 +395,4 @@ if ($CreateDesktopShortcut) {
 if (-not $SkipLaunch) {
     Start-Process -FilePath $LauncherExe -WorkingDirectory $RepoRoot
 }
-Write-Host ">>> [ALL PASS] Unified Suite v3.0.10 (14 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green
+Write-Host ">>> [ALL PASS] Unified Suite v3.7.1 (15 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green

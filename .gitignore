@@ -1,6 +1,8 @@
 # Compiled binaries & build outputs
 *.exe
 *.dll
+*.addon64
+*.addon32
 *.pdb
 *.obj
 *.o
@@ -53,3 +55,10 @@ Desktop.ini
 # Local prebuilt release bundles (uploaded via GitHub Releases, never committed)
 dist/
 *.zip
+*.dxbc
+workspace/shader_cache/
+*.esp
+*.esl
+*.pex
+workspace/ck_psc_headers/
+workspace/vortex_mod_stage/

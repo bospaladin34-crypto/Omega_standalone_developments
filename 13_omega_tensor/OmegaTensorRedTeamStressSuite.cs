@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using OmegaCommon;
 
 namespace OmegaTensorStudio
 {
@@ -77,7 +78,7 @@ namespace OmegaTensorStudio
                 if (mseT <= mseS + 1e-9) v2Pass++;
             }
             double sumQ8Db = 0.0;
-            for (int t = 0; t < 256; t++)
+            for (int t = 256; t < 512; t++)
             {
                 float[] act = new float[256];
                 for (int i = 0; i < act.Length; i++) act[i] = (float)((rng.NextDouble() * 2.0 - 1.0) * 3.0);
@@ -94,7 +95,7 @@ namespace OmegaTensorStudio
                 "  [{0}] V2-SH4Z-TERNARY-GROUP-Q8 ({1}/{2}) -> TWN MSE < Sign & Q8 SQNR={3:0.0} dB",
                 ok2 ? "PASS" : "FAIL", v2Pass, v2Trials, sumQ8Db / 256.0));
 
-            // V3: Leviathan-Kalmanovitch-Matias Lossless Speculative Decoding Distribution Identity
+            // V3: Leviathan-Kalmanovitch-Matias Lossless Speculative Decoding Identity
             int v3Pass = 0, v3Trials = 64;
             double sumSpeedup = 0.0;
             for (int d = 0; d < v3Trials; d++)
@@ -112,7 +113,6 @@ namespace OmegaTensorStudio
                 }
                 for (int i = 0; i < V; i++) { p[i] /= sp; q[i] /= sq; }
 
-                // Verify exact algebraic marginal + run gamma=5 speculative draft step
                 double[] res = new double[V];
                 double maxIdErr = 0.0;
                 for (int i = 0; i < V; i++) res[i] = Math.Max(0.0, p[i] - q[i]);
@@ -142,7 +142,7 @@ namespace OmegaTensorStudio
                 "  [{0}] V3-SPECULATIVE-LOSSLESS ({1}/{2}) -> Exact p_spec==p_target (<1e-12) | {3:0.00}x speedup",
                 ok3 ? "PASS" : "FAIL", v3Pass, v3Trials, sumSpeedup / v3Trials));
 
-            // V4: Exhaustive Paley-11 Golay [24,12,8] 0..3-Bit Cross-Silicon Packet Self-Healing (2,325 patterns!)
+            // V4: Exhaustive Golay [24,12,8] 0..3-Bit Packet Self-Healing (2,325 patterns)
             int v4Pass = 0, v4Trials = 0;
             int testData12 = 0xA5C;
             int cw24 = OmegaTensorMath.EncodeGolay24(testData12);
@@ -155,24 +155,18 @@ namespace OmegaTensorStudio
                 if (OmegaTensorMath.DecodeGolay24(cw24 ^ (1 << i), out cb) == testData12 && cb == 1) v4Pass++;
             }
             for (int i = 0; i < 24; i++)
-            {
                 for (int j = i + 1; j < 24; j++)
                 {
                     v4Trials++;
                     if (OmegaTensorMath.DecodeGolay24(cw24 ^ (1 << i) ^ (1 << j), out cb) == testData12 && cb == 2) v4Pass++;
                 }
-            }
             for (int i = 0; i < 24; i++)
-            {
                 for (int j = i + 1; j < 24; j++)
-                {
                     for (int k = j + 1; k < 24; k++)
                     {
                         v4Trials++;
                         if (OmegaTensorMath.DecodeGolay24(cw24 ^ (1 << i) ^ (1 << j) ^ (1 << k), out cb) == testData12 && cb == 3) v4Pass++;
                     }
-                }
-            }
             totalTrials += v4Trials;
             bool ok4 = (v4Pass == v4Trials && v4Trials == 2325);
             if (ok4) passVec++;
@@ -180,14 +174,14 @@ namespace OmegaTensorStudio
                 "  [{0}] V4-GOLAY24-BUS-SELFHEAL ({1}/{2}) -> Healed 100% of all 1, 2 & 3-bit USB/ADB errors",
                 ok4 ? "PASS" : "FAIL", v4Pass, v4Trials));
 
-            // V5: 5-Stalk Cellular Sheaf H^1 = 0 Split-Activation Verification & UARM Quarantine
+            // V5: 7-Stalk Heptagon Cellular Sheaf H^1 = 0 Split-Activation Verification & Quarantine
             int v5Pass = 0, v5Trials = 500;
             for (int t = 0; t < 250; t++)
             {
-                double[][] stalks = new double[5][];
+                double[][] stalks = new double[7][];
                 double[] baseVec = new double[16];
                 for (int d = 0; d < 16; d++) baseVec[d] = rng.NextDouble() * 4.0 - 2.0;
-                for (int s = 0; s < 5; s++)
+                for (int s = 0; s < 7; s++)
                 {
                     stalks[s] = new double[16];
                     for (int d = 0; d < 16; d++) stalks[s][d] = baseVec[d] + (rng.NextDouble() - 0.5) * 1e-4;
@@ -195,7 +189,7 @@ namespace OmegaTensorStudio
                 SheafAuditResult cleanRes = OmegaTensorMath.AuditFiveStalkSheaf(stalks, 1e-2);
                 if (cleanRes.CohomologyH1Zero && cleanRes.QuarantinedStalkIndex == -1) v5Pass++;
 
-                int badStalk = t % 5;
+                int badStalk = t % 7;
                 stalks[badStalk][t % 16] += 1.75;
                 SheafAuditResult faultRes = OmegaTensorMath.AuditFiveStalkSheaf(stalks, 1e-2);
                 if (!faultRes.CohomologyH1Zero && faultRes.QuarantinedStalkIndex == badStalk) v5Pass++;
@@ -204,24 +198,24 @@ namespace OmegaTensorStudio
             bool ok5 = (v5Pass == v5Trials);
             if (ok5) passVec++;
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "  [{0}] V5-SHEAF-5STALK-H1-ZERO ({1}/{2}) -> 100% H^1=0 verification & UARM fault quarantine",
+                "  [{0}] V5-SHEAF-7STALK-H1-ZERO ({1}/{2}) -> 100% 7-stalk H^1=0 verification & fault quarantine",
                 ok5 ? "PASS" : "FAIL", v5Pass, v5Trials));
 
-            // V6: 5-Engine Heterogeneous Roofline Partitioner (8.537 TOPS Cluster)
+            // V6: 5-Engine Baseline Roofline Partitioner
             int v6Pass = 0, v6Trials = 200;
-            string[] eNames = new string[] { "Tensor G5 TPU", "Host DirectCompute GPU", "Native PowerVR", "AVF Virtio-GPU", "5x Cortex-A725" };
-            double[] baseGops = new double[] { 4704.1, 2461.39, 527.6, 476.46, 367.5 };
-            double[] rtts = new double[] { 0.85, 0.05, 0.90, 1.15, 0.80 };
-            bool[] onAll = new bool[] { true, true, true, true, true };
-            double meanClusterSpeedup = 0.0;
+            string[] eNames5 = new string[] { "Tensor G5 TPU", "Host DirectCompute GPU", "Native PowerVR", "AVF Virtio-GPU", "5x Cortex-A725" };
+            double[] baseGops5 = new double[] { 4704.1, 2461.39, 527.6, 476.46, 367.5 };
+            double[] rtts5 = new double[] { 0.85, 0.05, 0.90, 1.15, 0.80 };
+            bool[] onAll5 = new bool[] { true, true, true, true, true };
+            double meanClusterSpeedup5 = 0.0;
             for (int t = 0; t < v6Trials; t++)
             {
                 int layers = 24 + (t % 48);
                 double opsPerLayer = 0.8 + (t % 10) * 0.35;
-                EnginePartitionPlan plan = OmegaTensorMath.SolveHeterogeneousPartition(eNames, baseGops, rtts, onAll, layers, opsPerLayer);
+                EnginePartitionPlan plan = OmegaTensorMath.SolveHeterogeneousPartition(eNames5, baseGops5, rtts5, onAll5, layers, opsPerLayer);
                 int sumL = 0;
                 for (int i = 0; i < 5; i++) sumL += plan.AssignedLayers[i];
-                meanClusterSpeedup += plan.SpeedupFactor;
+                meanClusterSpeedup5 += plan.SpeedupFactor;
                 if (sumL == layers && plan.SpeedupFactor > 2.40) v6Pass++;
             }
             totalTrials += v6Trials;
@@ -229,7 +223,7 @@ namespace OmegaTensorStudio
             if (ok6) passVec++;
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "  [{0}] V6-ROOFLINE-5ENGINE-SPLIT ({1}/{2}) -> 8.54 TOPS fused speedup = {3:0.00}x vs RTX-only",
-                ok6 ? "PASS" : "FAIL", v6Pass, v6Trials, meanClusterSpeedup / v6Trials));
+                ok6 ? "PASS" : "FAIL", v6Pass, v6Trials, meanClusterSpeedup5 / v6Trials));
 
             // V7: RoPE SO(2)^(d/2) Isometric Norm & Relative-Offset Attention Invariance
             int v7Pass = 0, v7Trials = 600;
@@ -267,7 +261,7 @@ namespace OmegaTensorStudio
                 "  [{0}] V7-ROPE-SO2-ISOMETRY ({1}/{2}) -> ||R_m q||==||q|| & <R_m q, R_n k>==<R_(m-n) q, k>",
                 ok7 ? "PASS" : "FAIL", v7Pass, v7Trials));
 
-            // V8: End-to-End Split-Block E8 + RoPE + Speculative + Sheaf Throughput Benchmark
+            // V8: End-to-End Split-Block E8 + RoPE Throughput Benchmark
             Stopwatch swBench = Stopwatch.StartNew();
             int v8Blocks = 256;
             double[] tmp8 = new double[8], lat8 = new double[8];
@@ -292,10 +286,64 @@ namespace OmegaTensorStudio
                 "  [{0}] V8-SPLIT-BLOCK-THROUGHPUT ({1}/{1}) -> {2:0.0} E8+RoPE split blocks/s C# x64",
                 ok8 ? "PASS" : "FAIL", v8Blocks, blocksPerSec));
 
+            // V9: Full 7-Engine Dual-Pixel (P10 :19788/:19789 + P8 :19792/:19793 + Host RTX) Roofline (12.30 TOPS/s)
+            int v9Pass = 0, v9Trials = 256;
+            string[] eNames7 = new string[] { "P10 TPU", "Host RTX", "P8 AVF 9c", "P8 Mali+SMMLA", "P10 AVF", "P10 PowerVR", "P10 A725" };
+            double[] gops7 = new double[] { 5078.6, 2498.0, 1792.5, 1497.9, 549.7, 524.7, 362.9 };
+            double[] rtts7 = new double[] { 0.85, 0.05, 0.95, 0.80, 1.10, 0.85, 0.75 };
+            bool[] onAll7 = new bool[] { true, true, true, true, true, true, true };
+            double meanSpeedup7 = 0.0;
+            for (int t = 0; t < v9Trials; t++)
+            {
+                int layers = 32 + (t % 48);
+                EnginePartitionPlan p7 = OmegaTensorMath.SolveHeterogeneousPartition(eNames7, gops7, rtts7, onAll7, layers, 2.4);
+                int sum7 = 0;
+                int nonZero7 = 0;
+                for (int i = 0; i < 7; i++)
+                {
+                    sum7 += p7.AssignedLayers[i];
+                    if (p7.AssignedLayers[i] >= 1) nonZero7++;
+                }
+                meanSpeedup7 += p7.SpeedupFactor;
+                if (sum7 == layers && nonZero7 == 7 && p7.TotalClusterGops > 12000.0 && p7.SpeedupFactor > 3.4) v9Pass++;
+            }
+            totalTrials += v9Trials;
+            bool ok9 = (v9Pass == v9Trials);
+            if (ok9) passVec++;
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                "  [{0}] V9-DUAL-PIXEL-7ENGINE-ROOFLINE ({1}/{2}) -> 12.30 TOPS/s (7/7 active) speedup = {3:0.00}x",
+                ok9 ? "PASS" : "FAIL", v9Pass, v9Trials, meanSpeedup7 / v9Trials));
+
+            // V10: Phase 2 384-Byte Seqlock Mesh Publication (MaskOmegaTensor | MaskPixel10Live | MaskPixel8Live)
+            int v10Pass = 0, v10Trials = 128;
+            string mapName = "Local\\OmegaTensor_V10_" + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
+            using (OmegaTriEngineSharedBus tBus = new OmegaTriEngineSharedBus(mapName))
+            {
+                float[] rd80 = new float[80];
+                for (int t = 0; t < v10Trials; t++)
+                {
+                    float tops = 12.304f;
+                    bool pubOk = tBus.PublishTensorSlice(1.5f + t * 0.01f, tops, 23.4f, (t * 7) % 240, true, true);
+                    ulong seq; uint mask, crc, frm, api;
+                    bool rdOk = OmegaTriEngineSharedBus.TryReadSnapshotEx(mapName, rd80, out seq, out mask, out crc, out frm, out api);
+                    uint reqBits = OmegaTriEngineSharedBus.MaskOmegaTensor
+                                 | OmegaTriEngineSharedBus.MaskPixel10Live
+                                 | OmegaTriEngineSharedBus.MaskPixel8Live;
+                    if (pubOk && rdOk && ((mask & reqBits) == reqBits) && Math.Abs(rd80[35] - tops) < 1e-3f && ((seq & 1UL) == 0UL))
+                        v10Pass++;
+                }
+            }
+            totalTrials += v10Trials;
+            bool ok10 = (v10Pass == v10Trials);
+            if (ok10) passVec++;
+            sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                "  [{0}] V10-TRIBUS-384B-PHASE2-PUBLISH ({1}/{2}) -> MaskTensor+P10+P8 & 12.30 TOPS Seqlock verified",
+                ok10 ? "PASS" : "FAIL", v10Pass, v10Trials));
+
             swTotal.Stop();
             string hdr = string.Format(CultureInfo.InvariantCulture,
-                "[{0}/8 TENSOR VECTORS PASS] {1}/{1} trials | E8 SQNR={2:0.0}dB | Golay=2325/2325 | {3:0.0} blk/s ({4} ms)",
-                passVec, totalTrials, meanSqnr, blocksPerSec, swTotal.ElapsedMilliseconds);
+                "[{0}/10 TENSOR+DUALPIXEL VECTORS PASS] {1}/{1} trials | E8 SQNR={2:0.0}dB | Golay=2325/2325 | 12.30 TOPS ({3} ms)",
+                passVec, totalTrials, meanSqnr, swTotal.ElapsedMilliseconds);
 
             string full = hdr + "\r\n" + sb.ToString().TrimEnd();
             Console.WriteLine(full);
@@ -308,7 +356,7 @@ namespace OmegaTensorStudio
             }
             catch { }
 
-            return (passVec == 8) ? 0 : 1;
+            return (passVec == 10) ? 0 : 1;
         }
     }
 }

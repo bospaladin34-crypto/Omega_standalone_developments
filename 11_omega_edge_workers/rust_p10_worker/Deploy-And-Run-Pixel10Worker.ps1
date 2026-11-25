@@ -115,24 +115,39 @@ if ($Adb -eq "") {
 }
 if ($Adb -eq "") { exit 0 }
 
-$DevLines = @(& $Adb devices 2>&1)
+# Deterministically pick Pixel 10 (frankel / 58170..) even when Pixel 8 (3A121..) is listed first!
+$DevLines = @(& $Adb devices -l 2>&1)
 $Serials = @()
+$P10Ser = ""
 foreach ($dl in $DevLines) {
     $t = "$dl".Trim()
-    if ($t -match "^(\S+)\s+device$") { $Serials += $Matches[1] }
+    if ($t -match "^(\S+)\s+device\b(.*)$") {
+        $candSer = $Matches[1]
+        $meta = $Matches[2]
+        $Serials += $candSer
+        if (($candSer -match "^58170") -or ($meta -imatch "frankel|Pixel_10|laguna")) {
+            $P10Ser = $candSer
+        }
+    }
 }
-if ($Serials.Count -eq 0) {
+if (($P10Ser -eq "") -and ($Serials.Count -gt 0)) {
+    foreach ($cs in $Serials) {
+        if ($cs -notmatch "^3A121") { $P10Ser = $cs; break }
+    }
+    if ($P10Ser -eq "") { $P10Ser = $Serials[0] }
+}
+if ($P10Ser -eq "") {
     Write-Host "    [INFO] Pixel 10 unplugged; running full Host DirectCompute GPU Tensor/Vulkan Suite:" -ForegroundColor Yellow
     if (Test-Path $HostExe) { & $HostExe --bench | Out-Host }
     exit 0
 }
 
-$P10Ser = $Serials[0]
 Write-Host "    [5c] Deploying v0.7.5 & Running Subgroup-128 + IntDot + CoopMatrix Suite on Pixel 10 ($P10Ser)..." -ForegroundColor Green
-& $Adb -s $P10Ser shell "pkill -f omega_p10_worker >/dev/null 2>&1" 2>&1 | Out-Null
+& $Adb -s $P10Ser shell "killall -q omega_p10_worker >/dev/null 2>&1" 2>&1 | Out-Null
 & $Adb -s $P10Ser push $P10Bin "/data/local/tmp/omega_p10_worker" 2>&1 | Out-Null
 & $Adb -s $P10Ser shell "chmod 755 /data/local/tmp/omega_p10_worker" 2>&1 | Out-Null
 & $Adb -s $P10Ser forward "tcp:$Port" "tcp:$Port" 2>&1 | Out-Null
+& $Adb -s $P10Ser forward "tcp:22222" "tcp:2222" 2>&1 | Out-Null
 
 if ($Action -eq "Daemon") {
     & $Adb -s $P10Ser shell "/data/local/tmp/omega_p10_worker --daemonize --port $Port" 2>&1 | Out-Null

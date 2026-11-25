@@ -509,39 +509,117 @@ namespace OmegaShellStudio
             return list;
         }
 
+        public static string ResolvePinnedPixelSerial(bool wantPixel8)
+        {
+            List<PixelAvfStatus> px = AndroidAvfDebianBridge.DiscoverFastPixelTopology();
+            for (int i = 0; i < px.Count; i++)
+            {
+                if (wantPixel8 && px[i].IsPixel8Slot) return px[i].Serial;
+                if (!wantPixel8 && !px[i].IsPixel8Slot) return px[i].Serial;
+            }
+            return px.Count > 0 ? px[0].Serial : "";
+        }
+
         public static string RunOnPixelTarget(string sigil, string shellCmd)
         {
-            List<string> ser = ListAdbSerials();
-            if (ser.Count == 0) return "No ADB Pixel 10 connected (plug USB or promote wireless :5555).";
+            List<PixelAvfStatus> px = AndroidAvfDebianBridge.DiscoverFastPixelTopology();
+            if (px.Count == 0) return "No ADB Pixel connected (plug Pixel 10 / Pixel 8 via USB or :5555).";
 
+            string sig = (sigil ?? "@p10").Trim().ToLowerInvariant();
             string maskPrefix = "";
             string laneTag = "all-cores";
-            if (sigil == "@p10-sensor") { maskPrefix = "taskset 03 "; laneTag = "0x03:2xA520"; }
-            else if (sigil == "@p10-mid3") { maskPrefix = "taskset 1c "; laneTag = "0x1C:3xA725"; }
-            else if (sigil == "@p10-mid2") { maskPrefix = "taskset 60 "; laneTag = "0x60:2xA725"; }
-            else if (sigil == "@p10-compute" || sigil == "@p8") { maskPrefix = "taskset 7c "; laneTag = "0x7C:5xA725"; }
-            else if (sigil == "@p10-prime") { maskPrefix = "taskset 80 "; laneTag = "0x80:Cortex-X4"; }
+            bool wantP8 = sig.StartsWith("@p8", StringComparison.Ordinal);
+            bool useRootSu = (sig == "@p8-root");
 
-            List<string> targets = new List<string>();
-            if (sigil == "@pixels") targets.AddRange(ser);
-            else targets.Add(ser[0]);
+            if (sig == "@p10-sensor") { maskPrefix = "taskset 03 "; laneTag = "P10 0x03:2xA520"; }
+            else if (sig == "@p10-mid3") { maskPrefix = "taskset 1c "; laneTag = "P10 0x1C:3xA725"; }
+            else if (sig == "@p10-mid2") { maskPrefix = "taskset 60 "; laneTag = "P10 0x60:2xA725"; }
+            else if (sig == "@p10-compute") { maskPrefix = "taskset 7c "; laneTag = "P10 0x7C:5xA725"; }
+            else if (sig == "@p10-prime") { maskPrefix = "taskset 80 "; laneTag = "P10 0x80:Cortex-X4"; }
+            else if (sig == "@p8" || sig == "@p8-compute") { maskPrefix = "taskset 1ff "; laneTag = "P8 0x1FF:9c-TensorG3"; }
+            else if (sig == "@p8-root") { laneTag = "P8 ksud uid=0"; }
+            else if (sig == "@p10") { laneTag = "P10 Tensor-G5"; }
+
+            List<PixelAvfStatus> targets = new List<PixelAvfStatus>();
+            if (sig == "@pixels")
+            {
+                targets.AddRange(px);
+            }
+            else
+            {
+                for (int i = 0; i < px.Count; i++)
+                {
+                    if (wantP8 && px[i].IsPixel8Slot) { targets.Add(px[i]); break; }
+                    if (!wantP8 && !px[i].IsPixel8Slot) { targets.Add(px[i]); break; }
+                }
+                if (targets.Count == 0)
+                    return wantP8 ? "Pixel 8 (shiba / 3A121..) is not currently connected over ADB." : "Pixel 10 (frankel / 58170..) is not currently connected over ADB.";
+            }
 
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < targets.Count; i++)
             {
-                string fullCmd = (maskPrefix + shellCmd).Replace("\"", "\\\"");
-                string outTxt = Win32HardwareTuner.RunCmdFast(ResolveAdbExe(), "-s " + targets[i] + " shell \"" + fullCmd + "\"", 12000);
-                sb.AppendLine("[" + targets[i] + " :: " + laneTag + "] " + outTxt.Trim());
+                string rawCmd = maskPrefix + shellCmd;
+                string fullCmd = useRootSu
+                    ? ("su -c '" + rawCmd.Replace("'", "'\''") + "'").Replace("\"", "\\\"")
+                    : rawCmd.Replace("\"", "\\\"");
+                string outTxt = Win32HardwareTuner.RunCmdFast(ResolveAdbExe(), "-s " + targets[i].Serial + " shell \"" + fullCmd + "\"", 12000);
+                string devTag = targets[i].IsPixel8Slot ? "Pixel 8" : "Pixel 10";
+                sb.AppendLine("[" + devTag + " " + targets[i].Serial + " :: " + laneTag + "] " + outTxt.Trim());
             }
             return sb.ToString().Trim();
+        }
+
+        public static string ExecutePixel8WorkerVerb(string sub, string arg2, string shellRoot)
+        {
+            string adb = ResolveAdbExe();
+            string p8Ser = ResolvePinnedPixelSerial(true);
+            if (!string.IsNullOrEmpty(p8Ser))
+            {
+                Win32HardwareTuner.RunCmdFast(adb, "-s " + p8Ser + " forward --remove tcp:19790", 1200);
+                Win32HardwareTuner.RunCmdFast(adb, "-s " + p8Ser + " forward --remove tcp:19791", 1200);
+                Win32HardwareTuner.RunCmdFast(adb, "-s " + p8Ser + " forward tcp:19792 tcp:19792", 1800);
+                Win32HardwareTuner.RunCmdFast(adb, "-s " + p8Ser + " forward tcp:19793 tcp:19793", 1800);
+                Win32HardwareTuner.RunCmdFast(adb, "-s " + p8Ser + " forward tcp:22232 tcp:2222", 1800);
+            }
+            if (sub == "avf" || sub == "avf-daemon")
+            {
+                return AndroidAvfDebianBridge.DeployAndStartPersistentAvfVirtioDaemon(shellRoot, "droid", "p8");
+            }
+            if (sub == "wake" || sub == "daemon")
+            {
+                if (string.IsNullOrEmpty(p8Ser)) return "Pixel 8 (3A121..) not connected over ADB.";
+                Win32HardwareTuner.RunCmdFast(
+                    adb,
+                    "-s " + p8Ser + " shell \"if [ -x /data/local/tmp/omega_pocket_worker ]; then su -c 'killall -q omega_pocket_worker 2>/dev/null; /data/local/tmp/omega_pocket_worker --daemonize --stationary-boost --port 19792' 2>/dev/null || (/data/local/tmp/omega_pocket_worker --daemonize --port 19792); fi\"",
+                    3500);
+                System.Threading.Thread.Sleep(500);
+            }
+            if (sub == "dispatch" || sub == "bench")
+            {
+                StringBuilder b = new StringBuilder();
+                if (ProbePortFast(19792, 180)) b.AppendLine("[P8 Native :19792] " + HttpGetJson("http://127.0.0.1:19792/api/dispatch/gpu_cpu", 8000));
+                string bm;
+                if (AndroidAvfDebianBridge.EnsureHostPort19793Bridged(shellRoot, "droid", out bm))
+                    b.AppendLine("[P8 5.3GB AVF :19793 (" + bm + ")] " + HttpGetJson("http://127.0.0.1:19793/api/dispatch/gpu_cpu", 8000));
+                return b.Length > 0 ? b.ToString().TrimEnd() : "Pixel 8 (:19792/:19793) offline -- run 'p8 wake' or 'p8 avf'.";
+            }
+            StringBuilder st = new StringBuilder();
+            st.AppendLine("[P8 Native :19792] " + (ProbePortFast(19792, 180) ? HttpGetJson("http://127.0.0.1:19792/api/status", 3500) : "STANDBY"));
+            st.AppendLine("[P8 5.3GB AVF :19793] " + (ProbePortFast(19793, 180) ? HttpGetJson("http://127.0.0.1:19793/api/status", 3500) : "STANDBY"));
+            return st.ToString().TrimEnd();
         }
 
         public static string ExecutePixel10WorkerVerb(string sub, string arg2, string shellRoot)
         {
             string adb = ResolveAdbExe();
-            List<string> ser = ListAdbSerials();
-            if (ser.Count > 0)
-                Win32HardwareTuner.RunCmdFast(adb, "-s " + ser[0] + " forward tcp:19788 tcp:19788", 2000);
+            string p10Ser = ResolvePinnedPixelSerial(false);
+            List<string> ser = new List<string>();
+            if (!string.IsNullOrEmpty(p10Ser))
+            {
+                ser.Add(p10Ser);
+                Win32HardwareTuner.RunCmdFast(adb, "-s " + p10Ser + " forward tcp:19788 tcp:19788", 2000);
+            }
 
             if (sub == "host-bench" || sub == "host-tensor")
             {

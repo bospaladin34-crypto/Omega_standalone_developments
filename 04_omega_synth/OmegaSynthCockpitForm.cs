@@ -23,7 +23,7 @@ namespace OmegaSynthStudio
         }
     }
 
-    public sealed class OmegaSynthCockpitForm : Form
+    public sealed partial class OmegaSynthCockpitForm : Form
     {
         [StructLayout(LayoutKind.Sequential)]
         private struct NATIVE_MSG
@@ -348,6 +348,7 @@ namespace OmegaSynthStudio
                 Application.Idle -= OnAppIdleRenderLoop;
                 _uiTelemetryTimer.Stop();
                 try { timeEndPeriod(1u); } catch { }
+                DisposeTriEngineBus();
                 _mpeServer.Dispose();
                 _audio.Dispose();
                 _gpu.Dispose();
@@ -394,6 +395,7 @@ namespace OmegaSynthStudio
             }
 
             _audio.CopyTelemetrySnapshots(_e8Snap, _waveL, _waveR, _spec32, _voicesSnap);
+            PublishTriEngineBusFrame(t);
 
             int sw = Math.Max(64, _stage.ClientSize.Width);
             int sh = Math.Max(64, _stage.ClientSize.Height);

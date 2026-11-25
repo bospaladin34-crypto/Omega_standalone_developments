@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using OmegaPocketSiliconFusion;
 
 namespace OmegaTensorStudio
 {
@@ -95,14 +96,14 @@ namespace OmegaTensorStudio
 
                     if (path == "/v1/models")
                     {
-                        WriteHttp(ns, "200 OK", "application/json; charset=utf-8", "{\"object\":\"list\",\"data\":[{\"id\":\"omega-pocket-tensor-v3\",\"object\":\"model\",\"owned_by\":\"omega-standalone-labs\"}]}");
+                        WriteHttp(ns, "200 OK", "application/json; charset=utf-8", "{\"object\":\"list\",\"data\":[{\"id\":\"omega-dual-pixel-tensor-v321\",\"object\":\"model\",\"owned_by\":\"omega-standalone-labs\"}]}");
                         return;
                     }
                     if (path == "/v1/chat/completions")
                     {
-                        string promptV1 = string.IsNullOrEmpty(reqBody) ? "Hello OmegaTensor" : reqBody;
-                        string summaryV1 = _coord.ExecuteLiveHeterogeneousSplitBurst(_gpu, promptV1, false);
-                        string oaJson = "{\"id\":\"chatcmpl-omega\",\"object\":\"chat.completion\",\"model\":\"omega-pocket-tensor-v3\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"" + JsonEsc(summaryV1) + "\"},\"finish_reason\":\"stop\"}]}";
+                        string promptV1 = string.IsNullOrEmpty(reqBody) ? "Hello OmegaTensor 7-Engine Cluster" : reqBody;
+                        bool isOmshReq = (promptV1.IndexOf("EvalCustomOmsh", StringComparison.OrdinalIgnoreCase) >= 0) || (promptV1.IndexOf("omsh", StringComparison.OrdinalIgnoreCase) >= 0); string summaryV1 = isOmshReq ? _coord.SynthesizeOmshSnippet((promptV1.GetHashCode() & 0x7FFFFFFF) % 8) : _coord.ExecuteLiveHeterogeneousSplitBurst(_gpu, promptV1, true);
+                        string oaJson = "{\"id\":\"chatcmpl-omega\",\"object\":\"chat.completion\",\"model\":\"omega-dual-pixel-tensor-v321\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"" + JsonEsc(summaryV1) + "\"},\"finish_reason\":\"stop\"}]}";
                         WriteHttp(ns, "200 OK", "application/json; charset=utf-8", oaJson);
                         return;
                     }
@@ -112,12 +113,31 @@ namespace OmegaTensorStudio
                         WriteHttp(ns, "200 OK", "application/json; charset=utf-8", FormatStatusJson(s));
                         return;
                     }
-
+                    if (path == "/api/dual_pixel")
+                    {
+                        string heal = _coord.TryAutoRecoverDualPixelDaemons(true, true);
+                        string hw = OmegaPocketCore.ProbeLiveHardwareBridgesSummary();
+                        ClusterSplitSnapshot s = _coord.GetSnapshotCopy();
+                        string js = "{\"ok\":true,\"heal\":\"" + JsonEsc(heal) + "\",\"xray\":\"" + JsonEsc(hw) + "\",\"status\":" + FormatStatusJson(s) + "}";
+                        WriteHttp(ns, "200 OK", "application/json; charset=utf-8", js);
+                        return;
+                    }
+                    if (path == "/api/omsh_assist")
+                    {
+                        string mStr = ExtractQueryParam(query, "mode");
+                        int modeVal = 0;
+                        int.TryParse(mStr, out modeVal);
+                        string code = _coord.SynthesizeOmshSnippet(modeVal);
+                        ClusterSplitSnapshot s = _coord.GetSnapshotCopy();
+                        string js = "{\"ok\":true,\"omsh\":\"" + JsonEsc(code) + "\",\"cluster_tops\":" + s.TotalOnlineTops.ToString("0.000", CultureInfo.InvariantCulture) + "}";
+                        WriteHttp(ns, "200 OK", "application/json; charset=utf-8", js);
+                        return;
+                    }
                     if (path == "/api/dispatch" || path == "/api/infer")
                     {
                         string prompt = ExtractQueryParam(query, "prompt");
                         if (string.IsNullOrEmpty(prompt) && !string.IsNullOrEmpty(reqBody)) prompt = reqBody;
-                        if (string.IsNullOrEmpty(prompt)) prompt = "Mobile OLED Split-Inference Burst";
+                        if (string.IsNullOrEmpty(prompt)) prompt = "7-Engine Dual-Pixel Split-Inference Burst";
                         bool useAi = query.IndexOf("ai=1", StringComparison.OrdinalIgnoreCase) >= 0 || method == "POST";
                         string summary = _coord.ExecuteLiveHeterogeneousSplitBurst(_gpu, prompt, useAi);
                         if (_logCb != null) _logCb(summary);
@@ -126,7 +146,6 @@ namespace OmegaTensorStudio
                         WriteHttp(ns, "200 OK", "application/json; charset=utf-8", js);
                         return;
                     }
-
                     if (path == "/api/layers")
                     {
                         string lvStr = ExtractQueryParam(query, "n");
@@ -158,15 +177,17 @@ namespace OmegaTensorStudio
 
         private static string FormatStatusJson(ClusterSplitSnapshot s)
         {
-            StringBuilder sb = new StringBuilder(1024);
-            sb.Append("{\"ok\":true,\"service\":\"OmegaTensor v1.0.2 GM\",\"port\":19791,");
+            StringBuilder sb = new StringBuilder(1536);
+            sb.Append("{\"ok\":true,\"service\":\"OmegaTensor v1.2.0 GM\",\"port\":19791,");
             sb.AppendFormat(CultureInfo.InvariantCulture,
-                "\"total_online_gops\":{0:0.00},\"total_online_tops\":{1:0.000},\"layers\":{2},\"speedup_vs_rtx\":{3:0.00},\"last_step_ms\":{4:0.0},\"spec_tok_s\":{5:0.0},\"spec_accept_pct\":{6:0.0},\"e8_sqnr_db\":{7:0.00},\"golay_frames\":{8},\"golay_healed\":{9},\"sheaf_h1_zero\":{10},\"sheaf_summary\":\"{11}\",\"active_model\":\"{12}\",\"android_build\":\"{13}\",\"dispatches\":{14},\"engines\":[",
+                "\"total_online_gops\":{0:0.00},\"total_online_tops\":{1:0.000},\"layers\":{2},\"speedup_vs_rtx\":{3:0.00},\"last_step_ms\":{4:0.0},\"spec_tok_s\":{5:0.0},\"spec_accept_pct\":{6:0.0},\"e8_sqnr_db\":{7:0.00},\"golay_frames\":{8},\"golay_healed\":{9},\"sheaf_h1_zero\":{10},\"sheaf_summary\":\"{11}\",\"active_model\":\"{12}\",\"android_build\":\"{13}\",\"pixel10_live\":{14},\"pixel8_live\":{15},\"dispatches\":{16},\"engines\":[",
                 s.TotalOnlineGops, s.TotalOnlineTops, s.TotalTransformerLayers, s.SpeedupVsRtxOnly,
                 s.LastSplitStepMs, s.SpeculativeTokPerSec, s.SpeculativeAcceptRate * 100.0,
                 s.E8MeanSqnrDb, s.GolayFramesVerified, s.GolayBitsHealed,
-                s.SheafH1Zero ? "true" : "false", JsonEsc(s.SheafSummary), JsonEsc(s.ActiveLocalModel), JsonEsc(s.AndroidBuildBanner), s.DispatchesCompleted);
-            for (int i = 0; i < 5; i++)
+                s.SheafH1Zero ? "true" : "false", JsonEsc(s.SheafSummary), JsonEsc(s.ActiveLocalModel),
+                JsonEsc(s.AndroidBuildBanner), s.Pixel10Live ? "true" : "false", s.Pixel8Live ? "true" : "false",
+                s.DispatchesCompleted);
+            for (int i = 0; i < s.Engines.Length; i++)
             {
                 SiliconEngineTelemetry e = s.Engines[i];
                 if (i > 0) sb.Append(",");
@@ -181,21 +202,21 @@ namespace OmegaTensorStudio
         private static string BuildMobileDeckHtml()
         {
             return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" +
-                "<title>OmegaTensor :19791 OLED Split Deck</title>" +
+                "<title>OmegaTensor :19791 7-Engine Dual-Pixel OLED Deck</title>" +
                 "<style>body{margin:0;padding:14px;background:#070b14;color:#e2e8f0;font-family:Consolas,monospace}" +
                 "h2{margin:0 0 8px;color:#38bdf8;font-size:17px}.kpi{background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;margin-bottom:10px}" +
-                ".bar{height:18px;background:#1e293b;border-radius:4px;overflow:hidden;margin:4px 0 8px}.fill{height:100%;background:linear-gradient(90deg,#10b981,#38bdf8)}" +
-                "button{background:#0284c7;color:#fff;border:1px solid #38bdf8;border-radius:6px;padding:10px 12px;font-weight:700;margin:3px;cursor:pointer}" +
+                ".bar{height:16px;background:#1e293b;border-radius:4px;overflow:hidden;margin:3px 0 7px}.fill{height:100%;background:linear-gradient(90deg,#10b981,#38bdf8)}" +
+                "button{background:#0284c7;color:#fff;border:1px solid #38bdf8;border-radius:6px;padding:9px 11px;font-weight:700;margin:3px;cursor:pointer}" +
                 "input{width:96%;padding:9px;background:#090d16;color:#fff;border:1px solid #334155;border-radius:6px;margin-bottom:8px}</style></head><body>" +
-                "<h2>OMEGATENSOR v1.0.2 GM (:19791) :: 5-ENGINE SPLIT</h2>" +
-                "<div class='kpi' id='top'>Connecting to 5-engine cluster...</div>" +
-                "<input id='pr' value='Split 32 SH4Z+E8 layers across Tensor G5 TPU + DirectCompute GPU + PowerVR + Virtio-GPU'/>" +
-                "<div><button onclick='fire(0)'>1. Fire 5-Engine Split</button><button onclick='fire(1)' style='background:#7c3aed'>2. Split + Local AI</button>" +
+                "<h2>OMEGATENSOR v1.2.0 GM (:19791) :: 7-ENGINE DUAL-PIXEL SPLIT</h2>" +
+                "<div class='kpi' id='top'>Connecting to 7-engine cluster...</div>" +
+                "<input id='pr' value='Split 32 SH4Z+E8 layers across Host RTX + Pixel 10 (:19788/:19789) + Pixel 8 (:19792/:19793)'/>" +
+                "<div><button onclick='fire(0)'>1. Fire 7-Engine Split</button><button onclick='fire(1)' style='background:#7c3aed'>2. Split + Local AI</button>" +
                 "<button onclick='setL(32)'>32L</button><button onclick='setL(48)'>48L</button><button onclick='setL(64)'>64L</button></div>" +
                 "<div class='kpi' id='lanes' style='margin-top:10px'></div>" +
                 "<pre class='kpi' id='log' style='white-space:pre-wrap;font-size:12px;color:#a7f3d0'>Ready.</pre>" +
                 "<script>async function poll(){try{let r=await fetch('/api/status');let j=await r.json();" +
-                "document.getElementById('top').innerHTML='<b>Cluster: '+j.total_online_tops.toFixed(3)+' TOPS/s</b> | Speedup: '+j.speedup_vs_rtx.toFixed(2)+'x | Spec: '+j.spec_tok_s.toFixed(1)+' tok/s ('+j.spec_accept_pct.toFixed(1)+'%)<br>'+j.sheaf_summary+' | '+j.android_build;" +
+                "document.getElementById('top').innerHTML='<b>Cluster: '+j.total_online_tops.toFixed(3)+' TOPS/s</b> | Speedup: '+j.speedup_vs_rtx.toFixed(2)+'x | P10:'+j.pixel10_live+' P8:'+j.pixel8_live+'<br>'+j.sheaf_summary+' | '+j.android_build;" +
                 "let h='';for(let e of j.engines){let w=Math.min(100,(e.gops/52));h+='<div>'+(e.online?'[LIVE] ':'[IDLE] ')+e.name+' -> '+e.layers+'L ('+e.gops.toFixed(1)+' GOPS/s)</div><div class=\"bar\"><div class=\"fill\" style=\"width:'+w+'%\"></div></div>';}" +
                 "document.getElementById('lanes').innerHTML=h;}catch(x){}}" +
                 "async function fire(ai){let p=encodeURIComponent(document.getElementById('pr').value);let r=await fetch('/api/dispatch?ai='+ai+'&prompt='+p);let j=await r.json();document.getElementById('log').textContent=j.report;poll();}" +
@@ -271,9 +292,9 @@ namespace OmegaTensorStudio
             _gpu = new OmegaTensorDirectComputeGpu();
 
             AutoScaleMode = AutoScaleMode.None;
-            Text = "OmegaTensor v1.0.2 GM (:19791) :: Reboot-Proof 5-Engine Heterogeneous Split-Inference (5.08 TOPS TPU + DirectCompute GPU + PowerVR + Virtio-GPU + A725)";
-            ClientSize = new Size(1240, 820);
-            MinimumSize = new Size(1060, 700);
+            Text = "OmegaTensor v1.2.0 GM (:19791) :: 7-Engine Dual-Pixel + Dual-AVF Split-Inference & Phase-2 Tri-Engine Bus";
+            ClientSize = new Size(1260, 840);
+            MinimumSize = new Size(1080, 720);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = C(8, 12, 22);
             ForeColor = Color.White;
@@ -294,17 +315,17 @@ namespace OmegaTensorStudio
 
             _lblKpiTop = new Label();
             _lblKpiTop.UseMnemonic = false;
-            _lblKpiTop.SetBounds(14, 6, 1210, 22);
+            _lblKpiTop.SetBounds(14, 6, 1230, 22);
             _lblKpiTop.Font = new Font("Segoe UI Semibold", 13.0f, FontStyle.Bold, GraphicsUnit.Pixel);
             _lblKpiTop.ForeColor = C(56, 189, 248);
-            _lblKpiTop.Text = "OMEGATENSOR v1.0.2 GM (:19791) :: REBOOT-PROOF 5-SILICON SPLIT-INFERENCE & SPECULATIVE E8 ENGINE";
+            _lblKpiTop.Text = "OMEGATENSOR v1.2.0 GM (:19791) :: 7-TIER DUAL-PIXEL (P10 + P8 + DUAL AVF) + PHASE-2 384B SEQLOCK MESH";
 
             _lblKpiSub = new Label();
             _lblKpiSub.UseMnemonic = false;
-            _lblKpiSub.SetBounds(14, 29, 1210, 20);
-            _lblKpiSub.Font = new Font("Consolas", 11.4f, FontStyle.Bold, GraphicsUnit.Pixel);
+            _lblKpiSub.SetBounds(14, 29, 1230, 20);
+            _lblKpiSub.Font = new Font("Consolas", 11.2f, FontStyle.Bold, GraphicsUnit.Pixel);
             _lblKpiSub.ForeColor = C(52, 211, 153);
-            _lblKpiSub.Text = "Probing 5 Silicon Engines (:19788 Tensor G5 5.08 TOPS TPU + PowerVR + A725 | Host DirectCompute GPU | :19789 @deb)...";
+            _lblKpiSub.Text = "Probing 7 Silicon Tiers (Host RTX + P10 :19788/:19789 + P8 :19792/:19793)...";
 
             Label lLay = new Label();
             lLay.UseMnemonic = false;
@@ -315,10 +336,10 @@ namespace OmegaTensorStudio
 
             _cmbLayers = new ComboBox();
             _cmbLayers.DropDownStyle = ComboBoxStyle.DropDownList;
-            _cmbLayers.SetBounds(60, 56, 134, 26);
+            _cmbLayers.SetBounds(60, 56, 126, 26);
             _cmbLayers.BackColor = C(6, 9, 17);
             _cmbLayers.ForeColor = Color.White;
-            _cmbLayers.Font = new Font("Consolas", 11.2f, FontStyle.Regular, GraphicsUnit.Pixel);
+            _cmbLayers.Font = new Font("Consolas", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
             _cmbLayers.Items.AddRange(new object[] { "32 Layers (8B)", "48 Layers (14B)", "64 Layers (32B)", "80 Layers (70B)" });
             _cmbLayers.SelectedIndex = 0;
             _cmbLayers.SelectedIndexChanged += delegate
@@ -331,21 +352,21 @@ namespace OmegaTensorStudio
 
             _cmbView = new ComboBox();
             _cmbView.DropDownStyle = ComboBoxStyle.DropDownList;
-            _cmbView.SetBounds(202, 56, 172, 26);
+            _cmbView.SetBounds(192, 56, 166, 26);
             _cmbView.BackColor = C(6, 9, 17);
             _cmbView.ForeColor = C(56, 189, 248);
-            _cmbView.Font = new Font("Consolas", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
-            _cmbView.Items.AddRange(new object[] { "Split: Roofline + E8/Sheaf", "Left: 5-Engine + SpecRibbon", "Right: 240-Root E8 + H^1=0" });
+            _cmbView.Font = new Font("Consolas", 10.8f, FontStyle.Regular, GraphicsUnit.Pixel);
+            _cmbView.Items.AddRange(new object[] { "Split: 7-Lane + E8/Sheaf", "Left: 7-Tier + SpecRibbon", "Right: 240-Root E8 + H^1=0" });
             _cmbView.SelectedIndex = 0;
             _cmbView.SelectedIndexChanged += delegate { _gpu.ViewMode = _cmbView.SelectedIndex; };
 
-            Button bBurst = MakeBtn("1. Split Burst [Space]", 384, 54, 156, C(5, 150, 105));
+            Button bBurst = MakeBtn("1. 7-Tier Burst [Space]", 364, 54, 152, C(5, 150, 105));
             bBurst.Click += delegate { TriggerAsyncSplitBurst(false); };
 
-            Button bCalib = MakeBtn("2. Calibrate 5x Silicon", 548, 54, 158, C(124, 58, 237));
+            Button bCalib = MakeBtn("2. Calibrate 7x Silicon", 522, 54, 154, C(124, 58, 237));
             bCalib.Click += delegate { TriggerFullCalibrationAsync(); };
 
-            _btnAuto = MakeBtn("3. Auto-Stream: OFF", 714, 54, 148, C(30, 58, 138));
+            _btnAuto = MakeBtn("3. Auto-Stream: OFF", 682, 54, 142, C(30, 58, 138));
             _btnAuto.Click += delegate
             {
                 _autoStream = !_autoStream;
@@ -353,23 +374,19 @@ namespace OmegaTensorStudio
                 _btnAuto.BackColor = _autoStream ? C(16, 185, 129) : C(30, 58, 138);
             };
 
-            Button bBeam = MakeBtn("4. Beam P10 Deck", 870, 54, 132, C(67, 56, 202));
-            bBeam.Click += delegate { BeamDeckToPixelAsync(); };
+            Button bWakeP8P10 = MakeBtn("4. Wake P10+P8 AVF", 830, 54, 146, C(13, 148, 136));
+            bWakeP8P10.Click += delegate { WakeDualPixelsAndAvfAsync(); };
 
-            Button bAudit = MakeBtn("5. 8-Vec Stress", 1010, 54, 112, C(180, 83, 9));
+            Button bBeam = MakeBtn("5. Beam Dual OLED", 982, 54, 136, C(67, 56, 202));
+            bBeam.Click += delegate { BeamDeckToDualPixelsAsync(); };
+
+            Button bAudit = MakeBtn("6. 10-Vec Audit", 1124, 54, 118, C(180, 83, 9));
             bAudit.Click += delegate { RunStressSuiteToLogAsync(); };
-
-            Button bPng = MakeBtn("6. Save PNG", 1130, 54, 96, C(14, 116, 144));
-            bPng.Click += delegate
-            {
-                string saved = _gpu.SaveDiagnosticSnapshotPng(_baseDir, _coord.GetSnapshotCopy());
-                AppendLog("[SNAPSHOT SAVED] " + saved, C(56, 189, 248));
-            };
 
             topBar.Controls.AddRange(new Control[]
             {
                 _lblKpiTop, _lblKpiSub, lLay, _cmbLayers, _cmbView,
-                bBurst, bCalib, _btnAuto, bBeam, bAudit, bPng
+                bBurst, bCalib, _btnAuto, bWakeP8P10, bBeam, bAudit
             });
 
             Panel promptBar = new Panel();
@@ -385,13 +402,13 @@ namespace OmegaTensorStudio
             lPr.ForeColor = C(192, 132, 252);
 
             _txtPrompt = new TextBox();
-            _txtPrompt.SetBounds(104, 6, 920, 26);
+            _txtPrompt.SetBounds(104, 6, 940, 26);
             _txtPrompt.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             _txtPrompt.BackColor = C(6, 9, 17);
             _txtPrompt.ForeColor = Color.White;
             _txtPrompt.BorderStyle = BorderStyle.FixedSingle;
-            _txtPrompt.Font = new Font("Consolas", 11.8f, FontStyle.Regular, GraphicsUnit.Pixel);
-            _txtPrompt.Text = "Summarize how ACT-Omega partitions SH4Z/E8 transformer blocks across Tensor G5 TPU, DirectCompute GPU, PowerVR, and Virtio-GPU in 2 concise sentences.";
+            _txtPrompt.Font = new Font("Consolas", 11.6f, FontStyle.Regular, GraphicsUnit.Pixel);
+            _txtPrompt.Text = "Partition 32 SH4Z/E8 layers across Host RTX, Pixel 10 (:19788 TPU+PowerVR / :19789 AVF), and Pixel 8 (:19792 Mali-G715+SMMLA / :19793 5.3GB AVF).";
             _txtPrompt.KeyDown += delegate(object s, KeyEventArgs ke)
             {
                 if (ke.KeyCode == Keys.Enter)
@@ -401,7 +418,7 @@ namespace OmegaTensorStudio
                 }
             };
 
-            Button bInferAi = MakeBtn("Run Split + Local AI [Enter]", 1034, 4, 192, C(147, 51, 234));
+            Button bInferAi = MakeBtn("Run Split + Local AI [Enter]", 1054, 4, 192, C(147, 51, 234));
             bInferAi.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             bInferAi.Click += delegate { TriggerAsyncSplitBurst(true); };
 
@@ -443,7 +460,7 @@ namespace OmegaTensorStudio
             _rtbLog.BorderStyle = BorderStyle.None;
             _rtbLog.BackColor = C(6, 9, 17);
             _rtbLog.ForeColor = C(226, 232, 240);
-            _rtbLog.Font = new Font("Consolas", 11.2f, FontStyle.Regular, GraphicsUnit.Pixel);
+            _rtbLog.Font = new Font("Consolas", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
             botSplit.Panel2.Controls.Add(_rtbLog);
 
             mainSplit.Panel2.Controls.Add(botSplit);
@@ -495,16 +512,16 @@ namespace OmegaTensorStudio
             {
                 try
                 {
-                    mainSplit.SplitterDistance = Math.Max(340, (mainSplit.Height * 62) / 100);
-                    botSplit.SplitterDistance = Math.Max(580, (botSplit.Width * 58) / 100);
+                    mainSplit.SplitterDistance = Math.Max(330, (mainSplit.Height * 58) / 100);
+                    botSplit.SplitterDistance = Math.Max(600, (botSplit.Width * 58) / 100);
                 }
                 catch { }
 
                 bool gpuOk = _gpu.Initialize(_vpPanel.Handle, _vpPanel.ClientSize.Width, _vpPanel.ClientSize.Height);
                 bool httpOk = _http.Start();
-                AppendLog("=== OMEGATENSOR v1.0.2 GM (:19791) LIVE [REBOOT-PROOF + MULTITHREADED RPC] ===", C(56, 189, 248));
+                AppendLog("=== OMEGATENSOR v1.2.0 GM (:19791) LIVE [7-ENGINE DUAL-PIXEL + PHASE-2 384B SEQLOCK MESH] ===", C(56, 189, 248));
                 AppendLog("  GPU Backend : " + _gpu.BackendLabel + " (active=" + gpuOk + ")", C(52, 211, 153));
-                AppendLog("  HTTP Server : " + (httpOk ? "http://127.0.0.1:19791 (/api/status, /api/dispatch, /deck)" : "Port 19791 busy"), C(192, 132, 252));
+                AppendLog("  HTTP + Bus  : " + (httpOk ? "http://127.0.0.1:19791 (/api/status, /api/dual_pixel, /api/omsh_assist) + Local\\OmegaTriEngineUniforms" : "Port 19791 busy"), C(192, 132, 252));
 
                 RefreshUiFromSnapshot();
                 _renderTimer.Start();
@@ -513,8 +530,7 @@ namespace OmegaTensorStudio
                 {
                     ClusterSplitSnapshot snap0 = _coord.GetSnapshotCopy();
                     AppendLog("  " + msg, C(52, 211, 153));
-                    if (!string.IsNullOrEmpty(snap0.AndroidBuildBanner) && snap0.AndroidBuildBanner.IndexOf("Probing", StringComparison.OrdinalIgnoreCase) < 0)
-                        AppendLog("  Pixel 10 OS : " + snap0.AndroidBuildBanner, C(250, 204, 21));
+                    AppendLog("  " + snap0.AndroidBuildBanner, C(250, 204, 21));
                     RefreshUiFromSnapshot();
                 });
             };
@@ -524,6 +540,7 @@ namespace OmegaTensorStudio
                 _renderTimer.Stop();
                 _pollTimer.Stop();
                 _http.Dispose();
+                _coord.Dispose();
                 _gpu.Dispose();
             };
         }
@@ -537,7 +554,7 @@ namespace OmegaTensorStudio
             b.FlatStyle = FlatStyle.Flat;
             b.BackColor = bg;
             b.ForeColor = Color.White;
-            b.Font = new Font("Segoe UI Semibold", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
+            b.Font = new Font("Segoe UI Semibold", 10.6f, FontStyle.Regular, GraphicsUnit.Pixel);
             b.FlatAppearance.BorderColor = C(56, 189, 248);
             return b;
         }
@@ -562,23 +579,24 @@ namespace OmegaTensorStudio
             g.DefaultCellStyle.BackColor = C(9, 14, 26);
             g.DefaultCellStyle.ForeColor = Color.White;
             g.DefaultCellStyle.SelectionBackColor = C(30, 58, 138);
-            g.DefaultCellStyle.Font = new Font("Consolas", 11.0f, FontStyle.Regular, GraphicsUnit.Pixel);
+            g.DefaultCellStyle.Font = new Font("Consolas", 10.6f, FontStyle.Regular, GraphicsUnit.Pixel);
             g.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            g.RowTemplate.Height = 23;
 
-            g.Columns.Add("eng", "Silicon Engine");
+            g.Columns.Add("eng", "Silicon Engine (7 Tiers)");
             g.Columns.Add("st", "State");
             g.Columns.Add("lay", "Layers");
             g.Columns.Add("gops", "GOPS/s");
             g.Columns.Add("rtt", "RTT");
             g.Columns.Add("role", "Assigned Split Stage & Live Telemetry");
 
-            g.Columns[0].FillWeight = 25f;
+            g.Columns[0].FillWeight = 26f;
             g.Columns[1].FillWeight = 9f;
             g.Columns[2].FillWeight = 12f;
             g.Columns[3].FillWeight = 11f;
-            g.Columns[4].FillWeight = 10f;
+            g.Columns[4].FillWeight = 9f;
             g.Columns[5].FillWeight = 33f;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < ClusterSplitSnapshot.EngineCount; i++)
                 g.Rows.Add("", "STANDBY", "0L (0.0%)", "0.0", "0.0ms", "");
             return g;
         }
@@ -611,7 +629,7 @@ namespace OmegaTensorStudio
         {
             if (_busyBurst) return;
             _busyBurst = true;
-            AppendLog("[CALIBRATE] Probing Host DirectCompute GPU Vulkan Companion + Pixel 10 (:19788 TPU+PowerVR+A725) + AVF (:19789)...", C(250, 204, 21));
+            AppendLog("[CALIBRATE] Probing Host Vulkan Companion + Pixel 10 (:19788/:19789) + Pixel 8 (:19792/:19793)...", C(250, 204, 21));
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
@@ -631,6 +649,30 @@ namespace OmegaTensorStudio
             });
         }
 
+        private void WakeDualPixelsAndAvfAsync()
+        {
+            AppendLog("[WAKE DUAL-PIXEL] Arming pinned ADB/SSH tunnels (:19788/:19789/:22222 P10 + :19792/:19793/:22232 P8)...", C(56, 189, 248));
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    string heal = _coord.TryAutoRecoverDualPixelDaemons(true, true);
+                    if (!string.IsNullOrEmpty(heal)) AppendLog(heal, C(52, 211, 153));
+                    string p8Msg = OmegaPocketCore.BootstrapPixel8Avf53GbVm(_baseDir);
+                    AppendLog("[P8 5.3GB AVF] " + p8Msg, C(250, 204, 21));
+                    _coord.RefreshClusterHealthAsync(delegate(string m)
+                    {
+                        AppendLog(m, C(52, 211, 153));
+                        RefreshUiFromSnapshot();
+                    });
+                }
+                catch (Exception ex)
+                {
+                    AppendLog("[WAKE NOTE] " + ex.Message, C(248, 113, 113));
+                }
+            });
+        }
+
         private void RunStressSuiteToLogAsync()
         {
             ThreadPool.QueueUserWorkItem(delegate
@@ -646,16 +688,24 @@ namespace OmegaTensorStudio
             });
         }
 
-        private void BeamDeckToPixelAsync()
+        private void BeamDeckToDualPixelsAsync()
         {
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
                 {
                     string adb = ResolveAdbExe();
-                    RunCmd(adb, "reverse tcp:19791 tcp:19791", 2000);
-                    RunCmd(adb, "shell am start -a android.intent.action.VIEW -d \"http://127.0.0.1:19791/deck\"", 2500);
-                    AppendLog("[BEAM OK] Armed adb reverse tcp:19791 & launched OLED Split Deck on Pixel 10!", C(192, 132, 252));
+                    string diag;
+                    List<AdbDeviceRecord> devs = OmegaPocketCore.DiscoverLiveAdbPhones(1500, out diag);
+                    int beamed = 0;
+                    for (int i = 0; i < devs.Count; i++)
+                    {
+                        if (devs[i].State != "device") continue;
+                        RunCmd(adb, "-s " + devs[i].Serial + " reverse tcp:19791 tcp:19791", 2000);
+                        RunCmd(adb, "-s " + devs[i].Serial + " shell am start -a android.intent.action.VIEW -d \"http://127.0.0.1:19791/deck\"", 2500);
+                        beamed++;
+                    }
+                    AppendLog("[BEAM OK] Launched 7-Engine OLED Split Deck on " + beamed + " connected Pixel(s)!", C(192, 132, 252));
                 }
                 catch (Exception ex)
                 {
@@ -690,13 +740,14 @@ namespace OmegaTensorStudio
             {
                 ClusterSplitSnapshot s = _coord.GetSnapshotCopy();
                 _lblKpiSub.Text = string.Format(CultureInfo.InvariantCulture,
-                    "Cluster: {0:0.000} TOPS/s ({1:0.0} GOPS/s) | Split Speedup: {2:0.00}x vs RTX-Only | Speculative: {3:0.0} tok/s (Accept {4:0.0}%) | E8={5:0.0}dB | Golay Healed={6}b | {7}",
+                    "Cluster: {0:0.000} TOPS/s ({1:0.0} GOPS/s) | Speedup: {2:0.00}x | P10:{3} P8:{4} | Spec: {5:0.0} tok/s ({6:0.0}%) | E8={7:0.0}dB | {8}",
                     s.TotalOnlineTops, s.TotalOnlineGops, s.SpeedupVsRtxOnly,
+                    s.Pixel10Live ? "ON" : "--", s.Pixel8Live ? "ON" : "--",
                     s.SpeculativeTokPerSec, s.SpeculativeAcceptRate * 100.0,
-                    s.E8MeanSqnrDb, s.GolayBitsHealed, s.SheafSummary);
+                    s.E8MeanSqnrDb, s.SheafSummary);
 
-                if (IsDisposed || _gridEngines == null || _gridEngines.Rows.Count < 5) return;
-                for (int i = 0; i < 5; i++)
+                if (IsDisposed || _gridEngines == null || _gridEngines.Rows.Count < s.Engines.Length) return;
+                for (int i = 0; i < s.Engines.Length; i++)
                 {
                     SiliconEngineTelemetry e = s.Engines[i];
                     string rttStr = e.LastLatencyMs < 100.0
@@ -761,7 +812,7 @@ namespace OmegaTensorStudio
                     if (string.Equals(args[i], "--stress-test", StringComparison.OrdinalIgnoreCase))
                     {
                         int rc = OmegaTensorRedTeamStressSuite.RunAllVectors(baseDir);
-                        OmegaPocketSiliconFusion.Track02StressSummary p2 = OmegaPocketSiliconFusion.OmegaPocketStressSuite.RunAll8Vectors();
+                        Track02StressSummary p2 = OmegaPocketStressSuite.RunAll8Vectors();
                         Console.WriteLine("[FUSED POCKET+PC SILICON FUSION 8-VEC] " + p2.PassedCount + "/" + p2.TotalCount + " PASS (" + p2.TotalTrials + " trials)");
                         Environment.Exit((rc == 0 && p2.AllPassed) ? 0 : 1);
                         return;

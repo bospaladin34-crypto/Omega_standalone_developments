@@ -622,6 +622,16 @@ namespace OmegaStandaloneLab
                 "  3. Dual-ISA (x86_64/ARM64) SSA BraidIR + 240-Root E8 Differ + Sheaf #[repr(C)] Structs:\r\n" +
                 "     Strips 83.3% dead EFLAGS clobbers, renders a 60 FPS DirectCompute cs_5_0 8x8 E8 patch\r\n" +
                 "     heatmap, and exports lockstep Rust #[repr(C)], C++23 static_assert, and C# structs.\r\n"));
+            list.Add(new ManualChapter("17. OmegaEngine v1.0.0 (:19795) - 3D DirectCompute Arena & ReShade .fx",
+                "OMEGAENGINE v1.0.0 (15_omega_engine, [Shift+F3]) - TRI-ENGINE 3D PROCEDURAL ARENA\r\n" +
+                "====================================================================================\r\n" +
+                "  1. Playable 60-200 FPS cs_5_0 Sunken Obsidian Arena (WASD + Mouse Look + Space):\r\n" +
+                "     Zero-UV-seam 5D Penrose P3, 8D E8 Coxeter, Einstein Hat (arXiv:2303.10798), and\r\n" +
+                "     Chiral Spectre (arXiv:2305.17743) stone courtyard, Lenia caustic moat, refractive\r\n" +
+                "     6D icosahedral crystal monolith, and Sovngarde quasicrystal aurora sky dome.\r\n" +
+                "  2. Unified 320B Constant Buffer & Seqlock (Local\\OmegaTriEngineUniforms, float4 U[20]):\r\n" +
+                "     Streams camera, 48 kHz WASAPI/wavefield FFT, pentagrid phasons, and Thuum shockwaves\r\n" +
+                "     with 1-click BSD-3-Clause ReShade .fx + Phase 2 .addon64 export.\r\n"));
             return list;
         }
     }

@@ -17,16 +17,27 @@ namespace OmegaTensorStudio
 
     public sealed class EnginePartitionPlan
     {
-        public string[] EngineNames = new string[5];
-        public double[] MeasuredGops = new double[5];
-        public double[] RttMs = new double[5];
-        public bool[] Online = new bool[5];
-        public int[] AssignedLayers = new int[5];
-        public double[] ShareFraction = new double[5];
+        public string[] EngineNames;
+        public double[] MeasuredGops;
+        public double[] RttMs;
+        public bool[] Online;
+        public int[] AssignedLayers;
+        public double[] ShareFraction;
         public double TotalClusterGops;
         public double EstimatedSingleEngineMs;
         public double EstimatedFusedSplitMs;
         public double SpeedupFactor;
+
+        public EnginePartitionPlan(int count)
+        {
+            int n = Math.Max(1, count);
+            EngineNames = new string[n];
+            MeasuredGops = new double[n];
+            RttMs = new double[n];
+            Online = new bool[n];
+            AssignedLayers = new int[n];
+            ShareFraction = new double[n];
+        }
     }
 
     public sealed class SheafAuditResult
@@ -39,13 +50,11 @@ namespace OmegaTensorStudio
 
     public static class OmegaTensorMath
     {
-        // Exact 240 Minimal Roots of E8 (8D norm^2 == 2.0) + H4 30-fold Coxeter Plane Basis
         public static readonly float[,] E8Roots240 = new float[240, 8];
         public static readonly float[] CoxeterU = new float[8];
         public static readonly float[] CoxeterV = new float[8];
         public static readonly float[] E8RootProj2D = new float[240 * 2];
 
-        // Paley-11 [24, 12, 8] Extended Binary Golay Parity Submatrix & O(1) Syndrome Self-Healer LUT
         public static readonly ushort[] GolayParityRows12 = new ushort[12]
         {
             0xA3B, 0xC76, 0x8ED, 0x9DA, 0xBB4, 0xF68,
@@ -56,7 +65,6 @@ namespace OmegaTensorStudio
 
         static OmegaTensorMath()
         {
-            // 1. Populate all 240 roots of E8: 112 integer roots (+/- e_i +/- e_j) + 128 half-integer roots
             int idx = 0;
             for (int i = 0; i < 8; i++)
             {
@@ -84,7 +92,6 @@ namespace OmegaTensorStudio
                 }
             }
 
-            // Orthonormal 2D Coxeter-plane projection vectors for 30-fold H4 Petrie symmetry of E8
             double[] rawU = new double[8] { 0.509037, 0.425325, 0.309017, 0.162460, -0.162460, -0.309017, -0.425325, -0.363271 };
             double[] rawV = new double[8] { 0.085410, 0.309017, 0.425325, 0.509037, 0.425325, 0.309017, 0.085410, -0.425325 };
             NormalizeAndOrthogonalize8D(rawU, rawV, CoxeterU, CoxeterV);
@@ -101,7 +108,6 @@ namespace OmegaTensorStudio
                 E8RootProj2D[r * 2 + 1] = py;
             }
 
-            // 2. Populate O(1) Golay [24, 12, 8] 2,325-entry 0..3-bit error LUT
             for (int i = 0; i < 4096; i++)
             {
                 _golaySyndromeToErr24[i] = -1;
@@ -178,7 +184,6 @@ namespace OmegaTensorStudio
             return c;
         }
 
-        // Conway-Sloane Exact O(8) Nearest-Point E8 Lattice Quantizer: E8 = D8 U (D8 + 0.5*1)
         public static void RoundToD8(double[] x8, int offset, double[] outD8)
         {
             int sumInt = 0;
@@ -236,7 +241,6 @@ namespace OmegaTensorStudio
             double[] best = (d0 <= d1) ? c0 : c1;
             for (int i = 0; i < 8; i++) outLattice8[i] = best[i];
 
-            // Also identify most aligned E8 minimal root for 2D Coxeter HUD lighting
             int bestRoot = 0;
             double bestDot = -1e9;
             for (int r = 0; r < 240; r++)
@@ -266,7 +270,6 @@ namespace OmegaTensorStudio
             return (sumTwice % 4) == 0;
         }
 
-        // Li-Zhang-Liu Optimal SH4Z Ternary {-1, 0, +1} Quantizer + Scale Factor gamma*
         public static double QuantizeSh4zTernary(double[] weights, sbyte[] outTernary, out double mseTernary, out double mseNaiveSign)
         {
             int n = weights.Length;
@@ -306,7 +309,6 @@ namespace OmegaTensorStudio
             return gamma;
         }
 
-        // Symmetric Group-32 INT8 Block Quantizer -> SQNR in dB
         public static double QuantizeGroup32Int8(float[] input, sbyte[] outQ8, float[] outScales)
         {
             int n = input.Length;
@@ -339,7 +341,6 @@ namespace OmegaTensorStudio
             return 10.0 * Math.Log10(Math.Max(1e-12, sigPow) / errPow);
         }
 
-        // Extended Binary Golay [24, 12, 8] Encoder & O(1) 3-Bit Error Self-Healer
         public static int EncodeGolay24(int data12)
         {
             int d = data12 & 0xFFF;
@@ -374,7 +375,6 @@ namespace OmegaTensorStudio
             return (healed >> 12) & 0xFFF;
         }
 
-        // Rotary Position Embedding (RoPE) SO(2)^(d/2) Exact Norm-Preserving Transformer Rotation
         public static void ApplyRoPeInPlace(double[] vec, int tokenPos, double thetaBase)
         {
             int d = vec.Length;
@@ -392,7 +392,6 @@ namespace OmegaTensorStudio
             }
         }
 
-        // Leviathan-Kalmanovitch-Matias Exact Lossless Speculative Decoding Step
         public static int SampleCategorical(double[] probs, Random rng)
         {
             double u = rng.NextDouble();
@@ -477,10 +476,9 @@ namespace OmegaTensorStudio
             return res;
         }
 
-        // Cellular Sheaf H^1 = 0 5-Stalk Boundary Consistency Verifier + UARM Phase-3 Quarantine
+        // Cellular Sheaf H^1 = 0 N-Stalk Boundary Consistency Verifier + Fault Quarantine
         public static SheafAuditResult AuditFiveStalkSheaf(double[][] stalkBoundaryProjections, double tolerance)
         {
-            // Stalks 0..4 form a closed cycle + cross-chord verification ring against consensus median!
             int numStalks = stalkBoundaryProjections.Length;
             int dim = stalkBoundaryProjections[0].Length;
             double maxDefect = 0.0;
@@ -513,12 +511,12 @@ namespace OmegaTensorStudio
             r.MaxCoboundaryDefect = maxDefect;
             r.QuarantinedStalkIndex = r.CohomologyH1Zero ? -1 : worstStalk;
             r.Summary = r.CohomologyH1Zero
-                ? string.Format(CultureInfo.InvariantCulture, "H^1 = 0 EXACT (max |delta s| = {0:0.00e+0})", maxDefect)
-                : string.Format(CultureInfo.InvariantCulture, "H^1 != 0 -> UARM Quarantined Stalk #{0} (|delta s| = {1:0.000})", worstStalk, maxDefect);
+                ? string.Format(CultureInfo.InvariantCulture, "H^1 = 0 EXACT ({0} stalks, max |ds| = {1:0.00e+0})", numStalks, maxDefect)
+                : string.Format(CultureInfo.InvariantCulture, "H^1 != 0 -> Quarantined Stalk #{0} (|ds| = {1:0.000})", worstStalk, maxDefect);
             return r;
         }
 
-        // Latency-Aware 5-Engine Proportional Roofline Partitioner
+        // Generalized N-Engine Latency-Aware Proportional Roofline Partitioner (5-Engine or 7-Engine Dual-Pixel Cluster)
         public static EnginePartitionPlan SolveHeterogeneousPartition(
             string[] names,
             double[] gops,
@@ -527,12 +525,15 @@ namespace OmegaTensorStudio
             int totalTransformerLayers,
             double opsPerLayerGiga)
         {
-            EnginePartitionPlan p = new EnginePartitionPlan();
+            int n = (names != null) ? names.Length : 0;
+            EnginePartitionPlan p = new EnginePartitionPlan(Math.Max(1, n));
+            if (n <= 0) return p;
+
             double sumEff = 0.0;
-            double[] effGops = new double[5];
+            double[] effGops = new double[n];
             double bestSingleGops = 1.0;
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < n; i++)
             {
                 p.EngineNames[i] = names[i];
                 p.MeasuredGops[i] = gops[i];
@@ -542,17 +543,17 @@ namespace OmegaTensorStudio
                 {
                     p.TotalClusterGops += gops[i];
                     if (gops[i] > bestSingleGops) bestSingleGops = gops[i];
-                    // Penalize high-RTT links gracefully for tiny micro-layers
                     double computeRefMs = Math.Max(1.0, (opsPerLayerGiga * 4.0 / gops[i]) * 1000.0);
                     effGops[i] = gops[i] / (1.0 + 0.35 * (rttMs[i] / computeRefMs));
                     sumEff += effGops[i];
                 }
             }
 
+            int hostIdx = (n > 1) ? 1 : 0;
             if (sumEff <= 1e-6)
             {
-                p.AssignedLayers[1] = totalTransformerLayers;
-                p.ShareFraction[1] = 1.0;
+                p.AssignedLayers[hostIdx] = totalTransformerLayers;
+                p.ShareFraction[hostIdx] = 1.0;
                 p.EstimatedSingleEngineMs = 10.0;
                 p.EstimatedFusedSplitMs = 10.0;
                 p.SpeedupFactor = 1.0;
@@ -562,11 +563,11 @@ namespace OmegaTensorStudio
             int assigned = 0;
             int anchorIdx = 0;
             double bestEff = -1.0;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < n; i++)
             {
                 p.ShareFraction[i] = effGops[i] / sumEff;
                 int lv = (int)Math.Floor(p.ShareFraction[i] * totalTransformerLayers);
-                if (online[i] && gops[i] > 10.0 && lv == 0 && totalTransformerLayers >= 12) lv = 1;
+                if (online[i] && gops[i] > 10.0 && lv == 0 && totalTransformerLayers >= 14) lv = 1;
                 p.AssignedLayers[i] = lv;
                 assigned += lv;
                 if (effGops[i] > bestEff) { bestEff = effGops[i]; anchorIdx = i; }
@@ -574,17 +575,15 @@ namespace OmegaTensorStudio
             int diff = totalTransformerLayers - assigned;
             p.AssignedLayers[anchorIdx] = Math.Max(1, p.AssignedLayers[anchorIdx] + diff);
 
-            // Recompute exact makespan across parallel stages + overlap
             double maxStageMs = 0.5;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < n; i++)
             {
                 if (p.AssignedLayers[i] <= 0 || gops[i] <= 0.1) continue;
                 double stMs = ((p.AssignedLayers[i] * opsPerLayerGiga) / gops[i]) * 1000.0 + 0.18 * rttMs[i];
                 if (stMs > maxStageMs) maxStageMs = stMs;
             }
 
-            // Compare against running the entire stack on Host DirectCompute GPU alone (2,461.4 GOPS/s baseline)
-            double hostBaseGops = (online[1] && gops[1] > 10.0) ? gops[1] : bestSingleGops;
+            double hostBaseGops = (hostIdx < n && online[hostIdx] && gops[hostIdx] > 10.0) ? gops[hostIdx] : bestSingleGops;
             double singleMs = ((totalTransformerLayers * opsPerLayerGiga) / hostBaseGops) * 1000.0;
             p.EstimatedSingleEngineMs = singleMs;
             p.EstimatedFusedSplitMs = maxStageMs;

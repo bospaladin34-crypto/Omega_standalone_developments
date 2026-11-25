@@ -98,7 +98,7 @@ namespace OmegaShellStudio
 
             EnsureDefaultOshrc();
 
-            Text = "ACT-Omega Lab :: OmegaShell v1.1.6 Golden Master (10_omega_shell) — Gemma Command, Polyglot Code Studio, AVF Debian & Win32 Tuner (:19781)";
+            Text = "ACT-Omega Lab :: OmegaShell v1.2.0 Golden Master (10_omega_shell) — Gemma Command, Polyglot Code Studio, AVF Debian & Win32 Tuner (:19781)";
             Size = new Size(1680, 960);
             MinimumSize = new Size(1260, 720);
             StartPosition = FormStartPosition.CenterScreen;
@@ -261,7 +261,7 @@ namespace OmegaShellStudio
         {
             if (File.Exists(_oshrcPath)) return;
             string def =
-                "# OmegaShell v1.1.6 Golden Master Startup Script (.oshrc) — Runs automatically on launch\r\n" +
+                "# OmegaShell v1.2.0 Golden Master Startup Script (.oshrc) — Runs automatically on launch\r\n" +
                 "# Lines starting with # are comments. Define aliases, let variables, or startup checks:\r\n" +
                 "kv set shell.owner local-operator\r\n" +
                 "cloud status\r\n";
@@ -317,7 +317,7 @@ namespace OmegaShellStudio
 
             topRight.Controls.AddRange(new Control[] { bSpaceRelief, bQuickTrim, bQuickBoost, bHelp });
 
-            _lblTopBrand = MakeLbl("OMEGASHELL v1.1.6 GM (:19781)", new Font("Consolas", 9.4f, FontStyle.Bold), Color.FromArgb(52, 211, 153));
+            _lblTopBrand = MakeLbl("OMEGASHELL v1.2.0 GM (:19781)", new Font("Consolas", 9.4f, FontStyle.Bold), Color.FromArgb(52, 211, 153));
             _lblTopBrand.AutoSize = false;
             _lblTopBrand.Dock = DockStyle.Left;
             _lblTopBrand.Width = 250;
@@ -349,7 +349,7 @@ namespace OmegaShellStudio
             botBar.BackColor = Color.FromArgb(6, 9, 16);
 
             _lblStatus = MakeLbl(
-                "OmegaShell v1.1.6 Golden Master ONLINE (:19781) | Gemma Tool & Codegen Commander | Code Studio (Ctrl+Shift+F) | Android AVF (@deb)!",
+                "OmegaShell v1.2.0 Golden Master ONLINE (:19781) | Gemma Tool & Codegen Commander | Code Studio (Ctrl+Shift+F) | Android AVF (@deb)!",
                 new Font("Consolas", 8.4f),
                 Color.FromArgb(52, 211, 153));
             _lblStatus.AutoSize = false;
@@ -1008,7 +1008,7 @@ namespace OmegaShellStudio
                     int portsUp = 1 + (fgOn ? 1 : 0) + (brOn ? 1 : 0) + (avOn ? 1 : 0) + (mrOn ? 1 : 0) + (utcpOn ? 1 : 0) + (olOn ? 1 : 0);
 
                     string drvSummary = BuildCompactDriveRibbon();
-                    string avfTag = avfSsh ? " | @deb:SSH" : "";
+                    bool avf8Ssh = MeshAndLabBridge.ProbePortFast(22232, 45); string avfTag = (avfSsh ? " | @deb10:SSH" : "") + (avf8Ssh ? " | @deb8:SSH" : "");
                     string topLine = "CPU: " + cpu.ToString("0.0") + "% | DDR5 Free: " + mem.AvailPhysMb + "/" + mem.TotalPhysMb + " MB | " +
                         gpu + " | " + drvSummary + " | Mesh: " + portsUp + "/7" + avfTag;
 

@@ -11,10 +11,21 @@ namespace OmegaShellStudio
     public sealed partial class OmegaShellForm
     {
         private Label _lblAvfBanner;
+        private Label _lblDebPrompt;
+        private ComboBox _cmbAvfTarget;
         private TextBox _txtDebianUser, _txtDebianCmdInput, _txtAvfKeyAndScriptPreview;
         private RichTextBox _rtbDebianConsole;
         private DataGridView _gridAvfStatus, _gridAvfSharedFiles;
         private string _lastGuestOneLiner = "bash /mnt/shared/omega_debian_setup.sh || bash /mnt/shared/Download/omega_debian_setup.sh";
+
+        private string SelectedAvfTargetSpec()
+        {
+            if (_cmbAvfTarget == null) return "p10";
+            int idx = _cmbAvfTarget.SelectedIndex;
+            if (idx == 1) return "p8";
+            if (idx == 2) return "both";
+            return "p10";
+        }
 
         private void BuildTab3AndroidAvfUi(TabPage page)
         {
@@ -27,7 +38,7 @@ namespace OmegaShellStudio
             topBannerBar.BackColor = Color.FromArgb(11, 18, 33);
 
             _lblAvfBanner = MakeLbl(
-                "ANDROID 17 AVF DEBIAN 13 BRIDGE (pKVM + crosvm) :: Click '3. 1-Click Setup' then '4. Auto-Type -> Pixel' for Zero-Mount SSH (:22222)!",
+                "DUAL-PIXEL AVF DEBIAN 13 BRIDGE :: P10 (@deb10 :22222 / :19789 Virtio-GPU) + P8 (@deb8 :22232 / :19793 5.3GB 9c SMMLA)!",
                 new Font("Consolas", 8.8f, FontStyle.Bold),
                 Color.FromArgb(52, 211, 153));
             _lblAvfBanner.AutoSize = false;
@@ -43,28 +54,54 @@ namespace OmegaShellStudio
             actBar.Padding = new Padding(8, 5, 8, 5);
             actBar.BackColor = Color.FromArgb(14, 21, 38);
 
-            Button bProbe = MakeBtn("1. Probe AVF", Color.FromArgb(2, 132, 199));
+            Label lTgt = MakeLbl("Node:", null, Color.FromArgb(56, 189, 248));
+            lTgt.Padding = new Padding(2, 5, 2, 0);
+
+            _cmbAvfTarget = new ComboBox();
+            _cmbAvfTarget.DropDownStyle = ComboBoxStyle.DropDownList;
+            _cmbAvfTarget.Width = 204;
+            _cmbAvfTarget.BackColor = Color.FromArgb(6, 9, 17);
+            _cmbAvfTarget.ForeColor = Color.FromArgb(52, 211, 153);
+            _cmbAvfTarget.Font = new Font("Consolas", 8.8f, FontStyle.Bold);
+            _cmbAvfTarget.Items.AddRange(new object[]
+            {
+                "Pixel 10 (:22222 / :19789)",
+                "Pixel 8 (:22232 / :19793)",
+                "Dual P10 + P8 (Broadcast)"
+            });
+            _cmbAvfTarget.SelectedIndex = 0;
+            _cmbAvfTarget.SelectedIndexChanged += async delegate
+            {
+                if (_lblDebPrompt != null)
+                {
+                    int ix = _cmbAvfTarget.SelectedIndex;
+                    _lblDebPrompt.Text = ix == 1 ? "@deb8 [:22232]$ " : (ix == 2 ? "@deb-all [:22222+:22232]$ " : "@deb10 [:22222]$ ");
+                }
+                await RefreshAvfTabStateAsync();
+            };
+
+            Button bProbe = MakeBtn("1. Probe Dual AVF", Color.FromArgb(2, 132, 199));
             bProbe.Click += async delegate { await RefreshAvfTabStateAsync(); };
 
-            Button bKeygen = MakeBtn("2. Ed25519 Keygen", Color.FromArgb(109, 40, 217));
+            Button bKeygen = MakeBtn("2. Ed25519 Key", Color.FromArgb(109, 40, 217));
             bKeygen.Click += async delegate { await GenerateAvfSshKeyFromUiAsync(false); };
 
             Button bOneClick = MakeBtn("3. 1-Click Setup", Color.FromArgb(5, 150, 105));
             bOneClick.Click += async delegate { await RunOneClickDebianSetupFromUiAsync(); };
 
-            Button bAutoType = MakeBtn("4. Auto-Type -> Pixel", Color.FromArgb(217, 119, 6));
+            Button bAutoType = MakeBtn("4. Auto-Type SSH", Color.FromArgb(217, 119, 6));
             bAutoType.Click += async delegate { await RunAutoTypeDebianSshFromUiAsync(); };
 
-            Button bVirtioDaemon = MakeBtn("5. Start @deb Virtio-GPU (:19789)", Color.FromArgb(4, 120, 87));
+            Button bVirtioDaemon = MakeBtn("5. Start @deb Daemon (:19789/:19793)", Color.FromArgb(4, 120, 87));
             bVirtioDaemon.Click += async delegate { await DeployAvfVirtioDaemonFromUiAsync(); };
 
-            Button bDispUdot = MakeBtn("6. Dispatch 443G UDot (:19789)", Color.FromArgb(14, 116, 144));
+            Button bDispUdot = MakeBtn("6. Dispatch @deb Job", Color.FromArgb(14, 116, 144));
             bDispUdot.Click += async delegate { await DispatchAvfUdotFromUiAsync(); };
 
             Button bNativeRust = MakeBtn("Bench @deb CLI", Color.FromArgb(6, 95, 70));
             bNativeRust.Click += async delegate { await RunNativeArm64RustBuildFromUiAsync(); };
 
-            Button bCopyCmd = MakeBtn("Copy Zero-Mount Cmd", Color.FromArgb(180, 83, 9));
+            Button bCopyCmd = MakeBtn("Copy Zero-Mount", Color.FromArgb(180, 83, 9));
             bCopyCmd.Click += delegate
             {
                 Clipboard.SetText(_lastGuestOneLiner);
@@ -74,18 +111,19 @@ namespace OmegaShellStudio
             Button bWake = MakeBtn("Wake + Keep-Alive", Color.FromArgb(88, 28, 135));
             bWake.Click += async delegate
             {
-                string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.WakeAndroidLinuxTerminalWithKeepAlive(""); });
+                string tgt = SelectedAvfTargetSpec();
+                string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.WakeAndroidLinuxTerminalWithKeepAlive(tgt); });
                 AppendColoredLine(_rtbDebianConsole, msg, Color.FromArgb(52, 211, 153));
                 SetSingleLineStatus(msg);
                 await RefreshAvfTabStateAsync();
             };
 
-            Button bTunnel = MakeBtn("Arm SSH (:22222)", Color.FromArgb(30, 58, 138));
+            Button bTunnel = MakeBtn("Arm Dual SSH (:22222/:22232)", Color.FromArgb(30, 58, 138));
             bTunnel.Click += async delegate
             {
-                string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.ArmAdbSshTunnels(""); });
+                string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.ArmAdbSshTunnels("both"); });
                 AppendColoredLine(_rtbDebianConsole, msg, Color.FromArgb(125, 211, 252));
-                SetSingleLineStatus("Armed ADB TCP port forwards (:22222 -> AVF :2222, :28022 -> Termux :8022).");
+                SetSingleLineStatus("Pinned P10 -> :22222/:19788/:19789 & P8 -> :22232/:19792/:19793.");
                 await RefreshAvfTabStateAsync();
             };
 
@@ -99,7 +137,7 @@ namespace OmegaShellStudio
             lUsr.Padding = new Padding(6, 5, 2, 0);
 
             _txtDebianUser = new TextBox();
-            _txtDebianUser.Width = 78;
+            _txtDebianUser.Width = 68;
             _txtDebianUser.Text = _settings.DebianLinuxUser;
             _txtDebianUser.BackColor = Color.FromArgb(6, 9, 17);
             _txtDebianUser.ForeColor = Color.White;
@@ -111,7 +149,7 @@ namespace OmegaShellStudio
 
             actBar.Controls.AddRange(new Control[]
             {
-                bProbe, bKeygen, bOneClick, bAutoType, bVirtioDaemon, bDispUdot, bNativeRust, bCopyCmd, bWake, bTunnel, bSyncFolder, bGemmaDeb, lUsr, _txtDebianUser
+                lTgt, _cmbAvfTarget, bProbe, bKeygen, bOneClick, bAutoType, bVirtioDaemon, bDispUdot, bNativeRust, bCopyCmd, bWake, bTunnel, bSyncFolder, bGemmaDeb, lUsr, _txtDebianUser
             });
 
             SplitContainer split = new SplitContainer();
@@ -134,9 +172,9 @@ namespace OmegaShellStudio
             {
                 { "uname & CPU", "uname -a && lscpu | head -n 14" },
                 { "RAM & Disk", "free -m && df -h" },
-                { "Toolchain Check", "which gcc clang rustc cargo python3 git sshd 2>&1 || true" },
+                { "Toolchains", "which gcc clang rustc cargo python3 git sshd 2>&1 || true" },
                 { "ls /mnt/shared", "ls -la /mnt/shared /mnt/shared/Download/linux 2>/dev/null || ls -la /sdcard/Download/linux" },
-                { "Listening Ports", "ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null" }
+                { "Worker Ports", "ss -tulpn 2>/dev/null | grep -E '2222|19789|19793' || ss -tln" }
             };
             for (int i = 0; i < debCmds.GetLength(0); i++)
             {
@@ -153,11 +191,11 @@ namespace OmegaShellStudio
             debInBar.Padding = new Padding(8, 5, 8, 5);
             debInBar.BackColor = Color.FromArgb(12, 19, 34);
 
-            Label lDebPrompt = MakeLbl("@deb [pixel-debian]$ ", new Font("Consolas", 9.4f, FontStyle.Bold), Color.FromArgb(52, 211, 153));
-            lDebPrompt.Dock = DockStyle.Left;
-            lDebPrompt.Padding = new Padding(0, 4, 4, 0);
+            _lblDebPrompt = MakeLbl("@deb10 [:22222]$ ", new Font("Consolas", 9.4f, FontStyle.Bold), Color.FromArgb(52, 211, 153));
+            _lblDebPrompt.Dock = DockStyle.Left;
+            _lblDebPrompt.Padding = new Padding(0, 4, 4, 0);
 
-            Button bDebSend = MakeBtn("Run on Debian", Color.FromArgb(5, 150, 105));
+            Button bDebSend = MakeBtn("Run on @deb", Color.FromArgb(5, 150, 105));
             bDebSend.Dock = DockStyle.Right;
             bDebSend.Click += async delegate { await SubmitDebianInputBoxAsync(); };
 
@@ -177,7 +215,7 @@ namespace OmegaShellStudio
             };
 
             debInBar.Controls.Add(_txtDebianCmdInput);
-            debInBar.Controls.Add(lDebPrompt);
+            debInBar.Controls.Add(_lblDebPrompt);
             debInBar.Controls.Add(bDebSend);
 
             _rtbDebianConsole = new RichTextBox();
@@ -209,7 +247,7 @@ namespace OmegaShellStudio
             topGridsSplit.SplitterWidth = 5;
 
             Panel pStat = new Panel(); pStat.Dock = DockStyle.Fill;
-            Label lStHdr = MakeLbl("PIXEL AVF / pKVM HYPERVISOR & OPENSSH TUNNEL MATRIX:", new Font("Segoe UI", 8.2f, FontStyle.Bold), Color.FromArgb(56, 189, 248));
+            Label lStHdr = MakeLbl("DUAL-PIXEL AVF / pKVM HYPERVISOR & PINNED PORT MATRIX (:22222 P10 | :22232 P8):", new Font("Segoe UI", 8.2f, FontStyle.Bold), Color.FromArgb(56, 189, 248));
             lStHdr.AutoSize = false; lStHdr.Dock = DockStyle.Top; lStHdr.Height = 22; lStHdr.Padding = new Padding(6, 3, 0, 0); lStHdr.BackColor = Color.FromArgb(14, 21, 38);
             _gridAvfStatus = MakeStyledGrid();
             AttachPipeContextMenu(_gridAvfStatus, delegate { return "avf status"; });
@@ -262,10 +300,10 @@ namespace OmegaShellStudio
             page.Controls.Add(topBannerBar);
 
             AppendColoredLine(_rtbDebianConsole,
-                "=== ANDROID LINUX / DEBIAN VIRTUALIZATION CONSOLE (@deb) ===\r\n" +
-                "  Step 1: Click '3. 1-Click Setup' (grants storage + creates Ed25519 key + stages zero-mount Base64 cmd).\r\n" +
-                "  Step 2: With Pixel Terminal open on your phone, click '4. Auto-Type -> Pixel' (types & starts sshd :2222 hands-free!).\r\n" +
-                "  Step 3: Run any ARM64 Debian Linux command here, or prefix '@gemma <goal>' for AI assistance!\r\n",
+                "=== DUAL-PIXEL ANDROID 17 AVF DEBIAN 13 CONSOLE (@deb10 + @deb8) ===\r\n" +
+                "  * Pixel 10 (frankel / 58170..): SSH 127.0.0.1:22222 | Native :19788 (TPU+PowerVR) | 5.0GB AVF :19789 (Virtio-GPU)\r\n" +
+                "  * Pixel 8  (shiba   / 3A121..): SSH 127.0.0.1:22232 | Native :19792 (Mali-G715+SMMLA) | 5.3GB AVF :19793 (9c SMMLA)\r\n" +
+                "  * Choose 'Pixel 10', 'Pixel 8', or 'Dual P10 + P8' in the Node selector above, or run @deb10 / @deb8 / @deb-all in Tab 1!\r\n",
                 Color.FromArgb(125, 211, 252));
 
             _mainTabs.SelectedIndexChanged += async delegate
@@ -289,11 +327,12 @@ namespace OmegaShellStudio
             else
                 _txtDebianCmdInput.Clear();
 
-            AppendColoredLine(_rtbDebianConsole, "@gemma-deb [" + _settings.DefaultAiModel + "]> " + goal, Color.FromArgb(192, 132, 252));
-            SetSingleLineStatus("Gemma @deb Assistant running on Pixel Linux...");
+            string tgt = SelectedAvfTargetSpec();
+            AppendColoredLine(_rtbDebianConsole, "@gemma-deb [" + tgt + " :: " + _settings.DefaultAiModel + "]> " + goal, Color.FromArgb(192, 132, 252));
+            SetSingleLineStatus("Gemma @deb Assistant running on " + tgt + "...");
             GemmaMissionResult res = await Task.Run(delegate
             {
-                return OmegaShellGemmaCommander.ExecuteAutonomousMission(_runtime, "On Pixel Android AVF Debian (@deb): " + goal, null);
+                return OmegaShellGemmaCommander.ExecuteAutonomousMission(_runtime, "On Pixel Android AVF Debian (" + tgt + "): " + goal, null);
             });
             AppendColoredLine(_rtbDebianConsole, res.FinalNarrative + "\r\n", Color.FromArgb(226, 232, 240));
             SetSingleLineStatus("Gemma @deb Assist completed in " + res.TotalMs + " ms.");
@@ -317,24 +356,27 @@ namespace OmegaShellStudio
         private async Task ExecuteInteractiveDebianCmdAsync(string cmd)
         {
             string user = (_txtDebianUser != null ? _txtDebianUser.Text : _settings.DebianLinuxUser).Trim();
-            AppendColoredLine(_rtbDebianConsole, "@deb [" + user + "@pixel]$ " + cmd, Color.FromArgb(52, 211, 153));
+            string tgt = SelectedAvfTargetSpec();
+            AppendColoredLine(_rtbDebianConsole, "@deb [" + user + "@" + tgt + "]$ " + cmd, Color.FromArgb(52, 211, 153));
             string sr = _shellRoot;
-            string outText = await Task.Run(delegate { return AndroidAvfDebianBridge.RunCommandInPixelDebian(sr, user, cmd, ""); });
+            string outText = await Task.Run(delegate { return AndroidAvfDebianBridge.RunCommandInPixelDebian(sr, user, cmd, tgt); });
             AppendColoredLine(_rtbDebianConsole, outText + "\r\n", Color.FromArgb(226, 232, 240));
-            SetSingleLineStatus("Executed @deb command on Pixel Linux (" + cmd + ")");
+            SetSingleLineStatus("Executed @deb (" + tgt + ") command: " + cmd);
         }
 
         private async Task RefreshAvfTabStateAsync()
         {
             string sr = _shellRoot;
+            string tgt = SelectedAvfTargetSpec();
             List<OshRow> statRows = await Task.Run(delegate { return AndroidAvfDebianBridge.BuildAvfStatusRows(sr); });
-            List<OshRow> fileRows = await Task.Run(delegate { return AndroidAvfDebianBridge.ListDebianSharedFilesRows(""); });
+            List<OshRow> fileRows = await Task.Run(delegate { return AndroidAvfDebianBridge.ListDebianSharedFilesRows(tgt); });
             if (fileRows.Count == 0)
             {
                 fileRows.Add(new OshRow()
+                    .Set("device", tgt)
                     .Set("name", "(empty)")
                     .Set("debian_path", "/mnt/shared/omega_workspace")
-                    .Set("note", "Click '3. 1-Click Debian Setup' or 'Sync -> /mnt/shared' to stage files"));
+                    .Set("note", "Click '3. 1-Click Setup' or 'Sync -> /mnt/shared' to stage files"));
             }
             PopulateGridWithOshRows(_gridAvfStatus, statRows);
             PopulateGridWithOshRows(_gridAvfSharedFiles, fileRows);
@@ -348,7 +390,7 @@ namespace OmegaShellStudio
             }
             else
             {
-                _txtAvfKeyAndScriptPreview.Text = "Click '2. Ed25519 Keygen' or '3. 1-Click Debian Setup' above to create your dedicated OpenSSH Ed25519 keypair and stage omega_debian_setup.sh onto your Pixel!";
+                _txtAvfKeyAndScriptPreview.Text = "Click '2. Ed25519 Key' or '3. 1-Click Setup' above to create your dedicated OpenSSH Ed25519 keypair and stage omega_debian_setup.sh onto Pixel 10 & Pixel 8!";
             }
         }
 
@@ -366,15 +408,16 @@ namespace OmegaShellStudio
         {
             string sr = _shellRoot;
             string usr = (_txtDebianUser != null ? _txtDebianUser.Text : _settings.DebianLinuxUser).Trim();
-            _lblAvfBanner.Text = "Deploying persistent systemd Virtio-GPU GFXStream Worker (:19789) inside AVF Debian 13...";
-            SetSingleLineStatus("Deploying & bridging persistent AVF @deb Virtio-GPU worker on 127.0.0.1:19789...");
-            AppendColoredLine(_rtbDebianConsole, "\r\n>>> [DEPLOYING PERSISTENT AVF @deb VIRTIO-GPU DAEMON (:19789)...]", Color.FromArgb(56, 189, 248));
-            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.DeployAndStartPersistentAvfVirtioDaemon(sr, usr, ""); });
+            string tgt = SelectedAvfTargetSpec();
+            _lblAvfBanner.Text = "Deploying persistent systemd AVF Worker (" + tgt + " -> :19789 / :19793) inside Debian 13...";
+            SetSingleLineStatus("Deploying & bridging persistent AVF @deb worker (" + tgt + ")...");
+            AppendColoredLine(_rtbDebianConsole, "\r\n>>> [DEPLOYING PERSISTENT AVF @deb DAEMON (" + tgt + ")...]", Color.FromArgb(56, 189, 248));
+            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.DeployAndStartPersistentAvfVirtioDaemon(sr, usr, tgt); });
             AppendColoredLine(_rtbDebianConsole, res + "\r\n", Color.FromArgb(52, 211, 153));
             _lblAvfBanner.Text = res.IndexOf("[HOST BRIDGE LIVE]", StringComparison.OrdinalIgnoreCase) >= 0
-                ? "PERSISTENT AVF @deb VIRTIO-GPU DAEMON LIVE ON http://127.0.0.1:19789 (systemd enabled)!"
-                : "AVF Virtio-GPU daemon step finished — inspect console below.";
-            SetSingleLineStatus("AVF @deb Virtio-GPU (:19789) deployment complete.");
+                ? ("PERSISTENT AVF @deb DAEMON LIVE (" + tgt.ToUpperInvariant() + " -> :19789 / :19793)!")
+                : "AVF daemon deployment finished -- inspect console below.";
+            SetSingleLineStatus("AVF @deb (" + tgt + ") deployment complete.");
             await RefreshAvfTabStateAsync();
         }
 
@@ -382,10 +425,11 @@ namespace OmegaShellStudio
         {
             string sr = _shellRoot;
             string usr = (_txtDebianUser != null ? _txtDebianUser.Text : _settings.DebianLinuxUser).Trim();
-            SetSingleLineStatus("Dispatching live K10_HW_UDOT_PACK4U8 (OpUDot 4x8b) job to AVF Virtio-GPU (:19789)...");
-            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.DispatchAvfVirtioUdotJob(sr, usr, ""); });
+            string tgt = SelectedAvfTargetSpec();
+            SetSingleLineStatus("Dispatching live compute job to AVF @deb (" + tgt + ")...");
+            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.DispatchAvfVirtioUdotJob(sr, usr, tgt); });
             AppendColoredLine(_rtbDebianConsole, "\r\n" + res + "\r\n", Color.FromArgb(52, 211, 153));
-            SetSingleLineStatus("Completed live AVF @deb Virtio-GPU (:19789) K10 dispatch.");
+            SetSingleLineStatus("Completed live AVF @deb (" + tgt + ") dispatch.");
             await RefreshAvfTabStateAsync();
         }
 
@@ -393,15 +437,16 @@ namespace OmegaShellStudio
         {
             string sr = _shellRoot;
             string usr = (_txtDebianUser != null ? _txtDebianUser.Text : _settings.DebianLinuxUser).Trim();
-            _lblAvfBanner.Text = "Streaming v0.7.0 Rust Source -> AVF Debian 13 (:22222) & Compiling Native ARM64 Binary on Tensor G5...";
-            SetSingleLineStatus("Compiling & benchmarking native aarch64-unknown-linux-gnu Rust inside Pixel 10 AVF Debian 13...");
-            AppendColoredLine(_rtbDebianConsole, "\r\n>>> [STARTING NATIVE ARM64 RUST BUILD OVER @deb 127.0.0.1:22222...]", Color.FromArgb(56, 189, 248));
-            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.RunNativeArm64RustBuildAndBenchInDebian(sr, usr, ""); });
+            string tgt = SelectedAvfTargetSpec();
+            _lblAvfBanner.Text = "Compiling & benchmarking native ARM64 worker inside AVF Debian 13 (" + tgt + ")...";
+            SetSingleLineStatus("Compiling & benchmarking native aarch64 worker on " + tgt + "...");
+            AppendColoredLine(_rtbDebianConsole, "\r\n>>> [STARTING NATIVE ARM64 BUILD & BENCH OVER @deb (" + tgt + ")...]", Color.FromArgb(56, 189, 248));
+            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.RunNativeArm64RustBuildAndBenchInDebian(sr, usr, tgt); });
             AppendColoredLine(_rtbDebianConsole, res + "\r\n", Color.FromArgb(52, 211, 153));
-            _lblAvfBanner.Text = res.IndexOf("[AVF-BUILD PASS]", StringComparison.OrdinalIgnoreCase) >= 0
-                ? "NATIVE ARM64 RUST COMPILED & VERIFIED LIVE INSIDE PIXEL 10 AVF DEBIAN 13 (:22222)!"
-                : "AVF Native Rust run finished — inspect output below.";
-            SetSingleLineStatus("AVF @deb native ARM64 Rust build & benchmark complete.");
+            _lblAvfBanner.Text = res.IndexOf("[AVF-BUILD", StringComparison.OrdinalIgnoreCase) >= 0
+                ? ("NATIVE ARM64 WORKER VERIFIED LIVE INSIDE AVF DEBIAN 13 (" + tgt.ToUpperInvariant() + ")!")
+                : "AVF Native build run finished -- inspect output below.";
+            SetSingleLineStatus("AVF @deb (" + tgt + ") native build & benchmark complete.");
             await RefreshAvfTabStateAsync();
         }
 
@@ -409,41 +454,44 @@ namespace OmegaShellStudio
         {
             string sr = _shellRoot;
             string usr = (_txtDebianUser != null ? _txtDebianUser.Text : _settings.DebianLinuxUser).Trim();
-            _lblAvfBanner.Text = "Auto-Typing Zero-Mount OpenSSH (:2222) Bootstrap into Pixel 10 AVF Terminal & Verifying :22222...";
-            SetSingleLineStatus("Typing zero-mount Base64 SSH setup into Pixel Terminal via ADB...");
-            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.AutoTypeZeroMountSshIntoPixelTerminal(sr, usr, ""); });
+            string tgt = SelectedAvfTargetSpec();
+            _lblAvfBanner.Text = "Auto-Typing Zero-Mount OpenSSH (:2222) Bootstrap into " + tgt + " AVF Terminal...";
+            SetSingleLineStatus("Typing zero-mount SSH setup into " + tgt + " Terminal via ADB...");
+            string res = await Task.Run(delegate { return AndroidAvfDebianBridge.AutoTypeZeroMountSshIntoPixelTerminal(sr, usr, tgt); });
             AppendColoredLine(_rtbDebianConsole, res + "\r\n", Color.FromArgb(52, 211, 153));
             _lblAvfBanner.Text = res.IndexOf("LIVE", StringComparison.OrdinalIgnoreCase) >= 0
-                ? "AVF DEBIAN 13 SSH LIVE ON 127.0.0.1:22222! Type any ARM64 Linux command below."
-                : "Auto-Type sent! Check Pixel Terminal screen, then click '1. Probe AVF'.";
-            SetSingleLineStatus("Auto-Type AVF SSH bootstrap complete.");
+                ? ("AVF DEBIAN 13 SSH LIVE (" + tgt.ToUpperInvariant() + ")! Type any ARM64 Linux command below.")
+                : "Auto-Type sent! Check Pixel Terminal screen, then click '1. Probe Dual AVF'.";
+            SetSingleLineStatus("Auto-Type AVF SSH bootstrap complete (" + tgt + ").");
             await RefreshAvfTabStateAsync();
         }
 
         private async Task RunOneClickDebianSetupFromUiAsync()
         {
             string sr = _shellRoot;
+            string tgt = SelectedAvfTargetSpec();
             string script = "", oneLiner = "";
-            _lblAvfBanner.Text = "Running 1-Click Ed25519 Keygen + Pushing omega_debian_setup.sh -> Pixel /mnt/shared + Arming TCP :22222...";
-            string report = await Task.Run(delegate { return AndroidAvfDebianBridge.ExecuteOneClickDebianBootstrap(sr, "", out script, out oneLiner); });
+            _lblAvfBanner.Text = "Running 1-Click Ed25519 Keygen + Staging omega_debian_setup.sh -> " + tgt + "...";
+            string report = await Task.Run(delegate { return AndroidAvfDebianBridge.ExecuteOneClickDebianBootstrap(sr, tgt, out script, out oneLiner); });
             _lastGuestOneLiner = oneLiner;
             try { Clipboard.SetText(oneLiner); } catch { }
             AppendColoredLine(_rtbDebianConsole, report + "\r\n", Color.FromArgb(52, 211, 153));
-            _lblAvfBanner.Text = "1-Click Bootstrap Ready! Paste/run in Pixel Terminal:  " + oneLiner;
-            SetSingleLineStatus("Staged omega_debian_setup.sh -> /mnt/shared & copied '" + oneLiner + "' to clipboard!");
+            _lblAvfBanner.Text = "1-Click Bootstrap Staged (" + tgt + ")! Click '4. Auto-Type SSH' or '5. Start @deb Daemon'.";
+            SetSingleLineStatus("Staged omega_debian_setup.sh -> " + tgt + " & copied zero-mount command to clipboard!");
             await RefreshAvfTabStateAsync();
         }
 
         private async Task PickAndSyncToDebianSharedAsync()
         {
+            string tgt = SelectedAvfTargetSpec();
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
                 ofd.InitialDirectory = ActiveWorkingDir();
-                ofd.Title = "Choose a source file to sync to Pixel /mnt/shared/omega_workspace (or Cancel to pick a folder)";
+                ofd.Title = "Choose a source file to sync to " + tgt + " /mnt/shared/omega_workspace (or Cancel to pick a folder)";
                 if (ofd.ShowDialog(this) == DialogResult.OK)
                 {
                     string picked = ofd.FileName;
-                    string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.SyncLocalPathToDebianShared(picked, ""); });
+                    string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.SyncLocalPathToDebianShared(picked, tgt); });
                     AppendColoredLine(_rtbDebianConsole, msg, Color.FromArgb(52, 211, 153));
                     await RefreshAvfTabStateAsync();
                     return;
@@ -452,11 +500,11 @@ namespace OmegaShellStudio
             using (FolderBrowserDialog fbd = new FolderBrowserDialog())
             {
                 fbd.SelectedPath = ActiveWorkingDir();
-                fbd.Description = "Choose a folder to sync to Pixel /mnt/shared/omega_workspace:";
+                fbd.Description = "Choose a folder to sync to " + tgt + " /mnt/shared/omega_workspace:";
                 if (fbd.ShowDialog(this) == DialogResult.OK)
                 {
                     string dir = fbd.SelectedPath;
-                    string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.SyncLocalPathToDebianShared(dir, ""); });
+                    string msg = await Task.Run(delegate { return AndroidAvfDebianBridge.SyncLocalPathToDebianShared(dir, tgt); });
                     AppendColoredLine(_rtbDebianConsole, msg, Color.FromArgb(52, 211, 153));
                     await RefreshAvfTabStateAsync();
                 }

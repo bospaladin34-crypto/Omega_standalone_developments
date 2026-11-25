@@ -1,0 +1,21 @@
+[package]
+name = "omega_skyrim_world_bridge"
+version = "1.7.7"
+edition = "2021"
+license = "MIT OR BSD-3-Clause"
+
+[lib]
+name = "omega_skyrim_world_bridge"
+crate-type = ["cdylib"]
+
+[dependencies]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

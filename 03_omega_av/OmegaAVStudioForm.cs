@@ -132,7 +132,7 @@ namespace OmegaAVStudio
   Application.Idle -= OnAppIdle;
   try { if (_learnForm != null) _learnForm.Dispose(); } catch { }
   _inputDeck.Dispose();
-  _wasapi.Stop(); _audio.Stop(); _oledServer.Stop(); _gpu.Dispose();
+  DisposeTriEngineBus(); _wasapi.Stop(); _audio.Stop(); _oledServer.Stop(); _gpu.Dispose();
   };
   Shown += delegate { _runningLoop = true; if (!string.IsNullOrEmpty(initialOpenPath)) TryApplyExternalOpen(initialOpenPath); };
  }
@@ -439,6 +439,7 @@ namespace OmegaAVStudio
   bool needCpuFb = !gpuSwap || capRecFrame || capOledFrame;
 
   RenderSceneToBuffer(_liveW, _liveH, needCpuFb ? _fb : null, t, false, true);
+  PublishTriEngineBusFrame(t);
 
   if (!gpuSwap)
   {

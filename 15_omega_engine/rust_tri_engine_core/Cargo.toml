@@ -1,0 +1,8 @@
+[package]
+name = "omega_tri_engine_core"
+version = "1.0.0"
+edition = "2021"
+description = "Zero-crate #![no_std] 320B Uniform Seqlock, E8 D8+ Coset Quantizer, and 5D Pentagrid Audit Crate for Station 15 OmegaEngine"
+
+[lib]
+path = "src/lib.rs"

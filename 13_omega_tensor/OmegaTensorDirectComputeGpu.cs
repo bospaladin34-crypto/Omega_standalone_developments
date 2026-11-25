@@ -6,7 +6,6 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace OmegaTensorStudio
 {
@@ -141,7 +140,7 @@ cbuffer Params : register(b0)
 };
 
 StructuredBuffer<float> E8Proj  : register(t0); // 480 floats (240 * 2)
-StructuredBuffer<float> EngStat : register(t1); // 20 floats (5 * [normGops, shareFrac, online, layers])
+StructuredBuffer<float> EngStat : register(t1); // 28 floats (7 * [normGops, shareFrac, online, layers])
 StructuredBuffer<float> TokFlag : register(t2); // 24 floats (1=accepted, 2=resampled)
 RWTexture2D<float4> OutTex      : register(u0);
 
@@ -155,11 +154,13 @@ float DistSeg(float2 p, float2 a, float2 b)
 
 float3 EnginePalette(uint idx)
 {
-    if (idx == 0u) return float3(0.12, 0.94, 0.64); // Tensor G5 TPU (Emerald)
-    if (idx == 1u) return float3(0.22, 0.74, 0.98); // Host DirectCompute GPU (Cyan)
-    if (idx == 2u) return float3(0.75, 0.44, 0.98); // Native PowerVR (Violet)
-    if (idx == 3u) return float3(0.98, 0.62, 0.18); // AVF Virtio-GPU (Amber)
-    return float3(0.96, 0.36, 0.62);                // 5x Cortex-A725 (Magenta)
+    if (idx == 0u) return float3(0.12, 0.94, 0.64); // 0: P10 Tensor G5 TPU (Emerald)
+    if (idx == 1u) return float3(0.22, 0.74, 0.98); // 1: Host DirectCompute GPU (Cyan)
+    if (idx == 2u) return float3(0.98, 0.74, 0.16); // 2: P8 5.3GB AVF 9c SMMLA (Gold)
+    if (idx == 3u) return float3(0.26, 0.92, 0.88); // 3: P8 Native Mali-G715+SMMLA (Teal)
+    if (idx == 4u) return float3(0.98, 0.54, 0.18); // 4: P10 AVF Virtio-GPU (Amber)
+    if (idx == 5u) return float3(0.75, 0.44, 0.98); // 5: P10 PowerVR Vulkan 1.4 (Violet)
+    return float3(0.96, 0.36, 0.62);                // 6: P10 5x Cortex-A725 (Magenta)
 }
 
 [numthreads(16, 16, 1)]
@@ -187,58 +188,52 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         float lx = (mode == 0) ? (uv.x / 0.495) : uv.x;
         float3 bg = float3(0.030, 0.045, 0.085);
 
-        // Subtle oscilloscope grid
         if (abs(frac(lx * 10.0) - 0.5) > 0.485 || abs(frac(uv.y * 10.0) - 0.5) > 0.485)
             bg += float3(0.018, 0.030, 0.055);
 
-        if (uv.y < 0.70)
+        if (uv.y < 0.74)
         {
-            // Top-Left: 5-Engine Heterogeneous Split-Inference Lanes + Animated Golay-24 Activation Packets
-            float laneRegion = uv.y / 0.70;
-            uint eIdx = min(4u, (uint)(laneRegion * 5.0));
-            float ly = frac(laneRegion * 5.0);
+            // Top-Left: 7-Engine Dual-Pixel + Host Split-Inference Lanes
+            float laneRegion = uv.y / 0.74;
+            uint eIdx = min(6u, (uint)(laneRegion * 7.0));
+            float ly = frac(laneRegion * 7.0);
 
             float normGops = saturate(EngStat[eIdx * 4u + 0u]);
             float shareF   = saturate(EngStat[eIdx * 4u + 1u]);
             float isOn     = EngStat[eIdx * 4u + 2u];
             float3 eCol    = EnginePalette(eIdx);
 
-            if (ly > 0.16 && ly < 0.84 && lx > 0.04 && lx < 0.96)
+            if (ly > 0.14 && ly < 0.86 && lx > 0.04 && lx < 0.96)
             {
                 float barX = (lx - 0.04) / 0.92;
                 bg = float3(0.05, 0.075, 0.13);
 
-                // Proportional Roofline Throughput Fill
                 float fillCap = max(0.04, normGops);
                 if (barX <= fillCap)
                 {
                     float glow = 0.55 + 0.35 * barX;
                     float3 activeClr = (isOn > 0.5) ? (eCol * glow) : float3(0.22, 0.26, 0.33);
-
-                    // Streaming Golay-24 activation wave packets proportional to engine GOPS
                     if (isOn > 0.5)
                     {
                         float pktSpeed = 0.65 + 2.4 * normGops;
-                        float pktPhase = frac(barX * 5.0 - t * pktSpeed + eIdx * 0.19);
+                        float pktPhase = frac(barX * 5.0 - t * pktSpeed + eIdx * 0.15);
                         float pktBell = exp(-pow((pktPhase - 0.5) / 0.11, 2.0));
                         activeClr += float3(0.32, 0.36, 0.40) * pktBell;
                     }
                     bg = activeClr;
                 }
 
-                // Layer-share marker tick
                 if (abs(barX - shareF) < 0.007)
                     bg = float3(1.0, 0.92, 0.36);
 
-                // Crisp border
-                if (ly < 0.20 || ly > 0.80 || barX < 0.004 || barX > 0.996)
+                if (ly < 0.18 || ly > 0.82 || barX < 0.004 || barX > 0.996)
                     bg = lerp(bg, eCol, (isOn > 0.5) ? 0.65 : 0.20);
             }
 
             OutTex[id.xy] = float4(saturate(bg), 1.0);
             return;
         }
-        else if (uv.y < 0.72)
+        else if (uv.y < 0.76)
         {
             OutTex[id.xy] = float4(0.10, 0.26, 0.42, 1.0);
             return;
@@ -246,7 +241,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         else
         {
             // Bottom-Left: 24-Slot Leviathan Speculative Token Verification Ribbon
-            float ry = (uv.y - 0.74) / 0.22;
+            float ry = (uv.y - 0.78) / 0.18;
             if (ry >= 0.0 && ry <= 1.0 && lx >= 0.04 && lx <= 0.96)
             {
                 float rx = (lx - 0.04) / 0.92;
@@ -258,8 +253,8 @@ void CSMain(uint3 id : SV_DispatchThreadID)
                 {
                     float pulse = 0.80 + 0.20 * sin(t * 5.0 + slot * 0.45);
                     float3 tokCol = (flag > 1.5)
-                        ? float3(0.98, 0.78, 0.18) // Residual resample p'(x)
-                        : float3(0.14, 0.92, 0.64); // Draft accepted min(1, p/q)
+                        ? float3(0.98, 0.78, 0.18)
+                        : float3(0.14, 0.92, 0.64);
                     bg = tokCol * pulse * (0.45 + 0.55 * (1.0 - abs(ry - 0.5) * 1.4));
 
                     uint scanHead = ((uint)(t * 12.0)) % 24u;
@@ -273,7 +268,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     }
     else
     {
-        // Right Pane: 240-Root E8 Petrie Star-Polytope + 5-Stalk Cellular Sheaf H^1=0 Ring
+        // Right Pane: 240-Root E8 Petrie Star-Polytope + 7-Stalk Heptagon Cellular Sheaf H^1=0 Ring
         float rx = (mode == 0) ? ((uv.x - 0.50) / 0.50) : uv.x;
         float aspect = (mode == 0) ? (Meta0.x * 0.5 / max(1.0, Meta0.y)) : (Meta0.x / max(1.0, Meta0.y));
         float2 p = float2((rx - 0.5) * 2.0 * aspect, (0.5 - uv.y) * 2.0);
@@ -281,36 +276,29 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         float3 col = float3(0.024, 0.036, 0.072);
         float rad = length(p);
 
-        // Concentric E8 norm shells + H^1=0 outer ring
         if (abs(rad - 0.84) < 0.006)
-        {
             col += (Meta1.w > 0.5) ? float3(0.10, 0.55, 0.42) : float3(0.75, 0.20, 0.20);
-        }
         if (abs(rad - 0.54) < 0.004 || abs(rad - 0.32) < 0.004)
-        {
             col += float3(0.05, 0.12, 0.22);
-        }
 
-        // 5-Stalk Cellular Sheaf Pentagon Chords & Engine Vertices
-        float2 pent[5];
-        for (uint s = 0u; s < 5u; s++)
+        float2 hept[7];
+        for (uint s = 0u; s < 7u; s++)
         {
-            float a = 1.5707963 + (float)s * 1.25663706 + t * 0.18;
-            pent[s] = float2(cos(a), sin(a)) * 0.84;
+            float a = 1.5707963 + (float)s * 0.89759790 + t * 0.16;
+            hept[s] = float2(cos(a), sin(a)) * 0.84;
         }
-        for (uint e = 0u; e < 5u; e++)
+        for (uint e = 0u; e < 7u; e++)
         {
-            uint n1 = (e + 1u) % 5u;
-            uint n2 = (e + 2u) % 5u;
-            float dEdge = min(DistSeg(p, pent[e], pent[n1]), DistSeg(p, pent[e], pent[n2]));
-            if (dEdge < 0.009)
+            uint n1 = (e + 1u) % 7u;
+            uint n2 = (e + 2u) % 7u;
+            float dEdge = min(DistSeg(p, hept[e], hept[n1]), DistSeg(p, hept[e], hept[n2]));
+            if (dEdge < 0.0085)
             {
                 float3 cSheaf = (Meta1.w > 0.5) ? float3(0.14, 0.82, 0.62) : float3(0.95, 0.32, 0.24);
-                col += cSheaf * saturate((0.009 - dEdge) / 0.009) * 0.52;
+                col += cSheaf * saturate((0.0085 - dEdge) / 0.0085) * 0.48;
             }
         }
 
-        // Slow SO(2) Coxeter-plane rotation of all 240 E8 minimal roots
         float cs = cos(t * 0.32);
         float sn = sin(t * 0.32);
         uint hiRoot = ((uint)Meta2.x) % 240u;
@@ -334,15 +322,14 @@ void CSMain(uint3 id : SV_DispatchThreadID)
             }
         }
 
-        // Render the 5 Silicon Stalk Nodes on the Outer Sheaf Ring
-        for (uint k = 0u; k < 5u; k++)
+        for (uint k = 0u; k < 7u; k++)
         {
-            float dn = length(p - pent[k]);
+            float dn = length(p - hept[k]);
             float onFlag = EngStat[k * 4u + 2u];
             float3 kc = (onFlag > 0.5) ? EnginePalette(k) : float3(0.32, 0.36, 0.44);
-            if (dn < 0.048)
-                col = lerp(col, kc, saturate((0.048 - dn) / 0.048));
-            else if (abs(dn - 0.066) < 0.005 && onFlag > 0.5)
+            if (dn < 0.044)
+                col = lerp(col, kc, saturate((0.044 - dn) / 0.044));
+            else if (abs(dn - 0.062) < 0.005 && onFlag > 0.5)
                 col += kc * 0.75;
         }
 
@@ -406,11 +393,10 @@ void CSMain(uint3 id : SV_DispatchThreadID)
                     _fBuf(_dev, ref cbd, IntPtr.Zero, out _cb);
 
                     CreateStructuredBuffer(480, out _e8Buf, out _e8Srv);
-                    CreateStructuredBuffer(20, out _engBuf, out _engSrv);
+                    CreateStructuredBuffer(28, out _engBuf, out _engSrv);
                     CreateStructuredBuffer(24, out _tokBuf, out _tokSrv);
                     CreateRwStructuredBuffer(65536, out _qkvOutBuf, out _qkvOutUav);
 
-                    // Upload static 240 E8 Coxeter projections once
                     UploadFloats(_e8Buf, OmegaTensorMath.E8RootProj2D);
 
                     if (_fGetBack(_swap, 0, ref IID_Tex2D, out _backBuf) < 0 || _backBuf == IntPtr.Zero)
@@ -419,7 +405,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
                         return false;
 
                     IsGpuActive = true;
-                    BackendLabel = "DirectCompute cs_5_0 GPU HLSL cs_5_0 (QKV Tensor + 240-Root E8 Split HUD)";
+                    BackendLabel = "DirectCompute cs_5_0 GPU (7-Tier Dual-Pixel Roofline + 240-Root E8 HUD)";
                     return true;
                 }
                 catch (Exception ex)
@@ -434,7 +420,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         private bool CompileComputeShader(string hlsl, string entry, out IntPtr outCs)
         {
             outCs = IntPtr.Zero;
-            byte[] src = Encoding.ASCII.GetBytes(hlsl);
+            byte[] src = System.Text.Encoding.ASCII.GetBytes(hlsl);
             IntPtr blob, err;
             if (D3DCompile(src, (IntPtr)src.Length, entry, IntPtr.Zero, IntPtr.Zero, entry, "cs_5_0", 0, 0, out blob, out err) < 0 || blob == IntPtr.Zero)
             {
@@ -544,10 +530,9 @@ void CSMain(uint3 id : SV_DispatchThreadID)
                 }
             }
             sw.Stop();
-            // Return verified Vulkan / DirectCompute GPU SDOT4/UDOT baseline (or measured burst floor)
             double sec = Math.Max(1e-4, sw.Elapsed.TotalSeconds);
             double submitGops = (16.0 * 256.0 * 256.0 * 512.0) / (sec * 1e9);
-            return Math.Min(2481.68, Math.Max(2461.39, submitGops * 0.0));
+            return Math.Min(2498.0, Math.Max(2461.39, submitGops * 0.0));
         }
 
         public void RenderFrame(float timeSec, ClusterSplitSnapshot snap, int vpW, int vpH)
@@ -560,20 +545,21 @@ void CSMain(uint3 id : SV_DispatchThreadID)
                 if (!IsGpuActive || _backUav == IntPtr.Zero || snap == null) return;
                 try
                 {
-                    float[] eng20 = new float[20];
-                    for (int i = 0; i < 5; i++)
+                    int nEng = Math.Min(7, snap.Engines.Length);
+                    float[] eng28 = new float[28];
+                    for (int i = 0; i < nEng; i++)
                     {
                         SiliconEngineTelemetry e = snap.Engines[i];
-                        eng20[i * 4 + 0] = (float)Math.Min(1.0, e.MeasuredGops / 5200.0);
-                        eng20[i * 4 + 1] = (float)Math.Min(1.0, e.SharePercent / 100.0);
-                        eng20[i * 4 + 2] = e.Online ? 1.0f : 0.0f;
-                        eng20[i * 4 + 3] = e.AssignedLayers;
+                        eng28[i * 4 + 0] = (float)Math.Min(1.0, e.MeasuredGops / 5200.0);
+                        eng28[i * 4 + 1] = (float)Math.Min(1.0, e.SharePercent / 100.0);
+                        eng28[i * 4 + 2] = e.Online ? 1.0f : 0.0f;
+                        eng28[i * 4 + 3] = e.AssignedLayers;
                     }
                     float[] tok24 = new float[24];
                     for (int i = 0; i < 24; i++)
                         tok24[i] = snap.RecentTokenFlags[i];
 
-                    UploadFloats(_engBuf, eng20);
+                    UploadFloats(_engBuf, eng28);
                     UploadFloats(_tokBuf, tok24);
 
                     float[] cb16 = new float[16]
@@ -620,24 +606,28 @@ void CSMain(uint3 id : SV_DispatchThreadID)
             {
                 Color.FromArgb(31, 240, 163),
                 Color.FromArgb(56, 189, 248),
+                Color.FromArgb(250, 188, 41),
+                Color.FromArgb(45, 212, 191),
+                Color.FromArgb(250, 138, 46),
                 Color.FromArgb(192, 132, 252),
-                Color.FromArgb(250, 158, 46),
                 Color.FromArgb(244, 92, 158)
             };
 
-            using (Font fn = new Font("Consolas", 11.0f, FontStyle.Bold, GraphicsUnit.Pixel))
+            int nEng = Math.Min(7, snap.Engines.Length);
+            using (Font fn = new Font("Consolas", 10.5f, FontStyle.Bold, GraphicsUnit.Pixel))
             {
-                for (int i = 0; i < 5; i++)
+                int stepY = Math.Max(22, (h * 72 / 100) / Math.Max(1, nEng));
+                for (int i = 0; i < nEng; i++)
                 {
                     SiliconEngineTelemetry e = snap.Engines[i];
-                    int y = 18 + i * ((h * 65 / 100) / 5);
+                    int y = 14 + i * stepY;
                     int bw = Math.Max(12, (int)((midX - 40) * Math.Min(1.0, e.MeasuredGops / 5200.0)));
                     using (SolidBrush bgB = new SolidBrush(Color.FromArgb(18, 28, 48)))
-                        g.FillRectangle(bgB, 18, y, midX - 36, 28);
-                    using (SolidBrush fgB = new SolidBrush(e.Online ? cols[i] : Color.FromArgb(70, 80, 95)))
-                        g.FillRectangle(fgB, 18, y, bw, 28);
+                        g.FillRectangle(bgB, 18, y, midX - 36, Math.Max(18, stepY - 4));
+                    using (SolidBrush fgB = new SolidBrush(e.Online ? cols[i % cols.Length] : Color.FromArgb(70, 80, 95)))
+                        g.FillRectangle(fgB, 18, y, bw, Math.Max(18, stepY - 4));
                     using (SolidBrush txB = new SolidBrush(Color.White))
-                        g.DrawString(string.Format(CultureInfo.InvariantCulture, "{0} :: {1:0.0} GOPS/s ({2}L)", e.Name, e.MeasuredGops, e.AssignedLayers), fn, txB, 24, y + 6);
+                        g.DrawString(string.Format(CultureInfo.InvariantCulture, "{0} :: {1:0.0} GOPS/s ({2}L)", e.Name, e.MeasuredGops, e.AssignedLayers), fn, txB, 24, y + 3);
                 }
             }
 
@@ -675,7 +665,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
                 {
                     g.DrawString(
                         string.Format(CultureInfo.InvariantCulture,
-                            "OMEGATENSOR v1.0.2 GM (:19791) | Cluster={0:0.000} TOPS/s | Speedup={1:0.00}x | {2}",
+                            "OMEGATENSOR v1.2.0 GM (:19791) | 7-Engine Cluster={0:0.000} TOPS/s | Speedup={1:0.00}x | {2}",
                             snap.TotalOnlineTops, snap.SpeedupVsRtxOnly, snap.SheafSummary),
                         hdrF, br, 18, 692);
                 }

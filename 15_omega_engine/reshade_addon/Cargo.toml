@@ -1,0 +1,21 @@
+[package]
+name = "omega_tri_engine_addon"
+version = "1.7.7"
+edition = "2021"
+license = "BSD-3-Clause OR MIT"
+
+[lib]
+name = "omega_tri_engine_addon"
+crate-type = ["cdylib"]
+
+[dependencies]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,9 @@
+[package]
+name = "omega_skyrim_world_bridge_core"
+version = "1.7.7"
+edition = "2021"
+license = "MIT OR BSD-3-Clause"
+description = "Zero-crate #![no_std] SKSE64 848B ABI, OmegaBraidRE RIP-Relative Scanner, Z-up Camera Isometry & Cellular Sheaf H^1=0 Audit Crate"
+
+[lib]
+path = "src/lib.rs"

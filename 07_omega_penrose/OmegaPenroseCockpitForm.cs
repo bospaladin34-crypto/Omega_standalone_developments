@@ -20,7 +20,7 @@ namespace OmegaPenroseStudio
         }
     }
 
-    public sealed class OmegaPenroseCockpitForm : Form
+    public sealed partial class OmegaPenroseCockpitForm : Form
     {
         [StructLayout(LayoutKind.Sequential)]
         private struct NATIVE_MSG
@@ -459,6 +459,7 @@ namespace OmegaPenroseStudio
                 Application.Idle -= OnAppIdleRenderLoop;
                 _uiTimer.Stop();
                 if (_aviRecorder.IsRecording) { try { _aviRecorder.StopAndSave(); } catch { } }
+                DisposeTriEngineBus();
                 _aviRecorder.Dispose();
                 _audioPipe.Dispose();
                 _padServer.Dispose();
@@ -579,6 +580,7 @@ namespace OmegaPenroseStudio
 
             if (_aviRecorder.IsRecording)
                 _aviRecorder.CaptureFrameIfDue(_stage, _simClock.ElapsedMilliseconds);
+            PublishTriEngineBusFrame(nowSec);
         }
 
         private void BuildTabbedRightRack(Panel host)

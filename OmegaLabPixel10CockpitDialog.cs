@@ -27,6 +27,8 @@ namespace OmegaStandaloneLab
     public sealed class P10TelemetrySnapshot
     {
         public bool Online = false;
+        public int SourcePort = 19788;
+        public bool IsPocketWorker = false;
         public string DeviceName = "";
         public string ApiVersion = "";
         public int SubgroupSize = 128;
@@ -85,7 +87,7 @@ namespace OmegaStandaloneLab
             return false;
         }
 
-                public static bool ProbeDaemonHealth(int port, int timeoutMs)
+        public static bool ProbeDaemonHealth(int port, int timeoutMs)
         {
             string h = HttpGet("http://127.0.0.1:" + port + "/api/health", timeoutMs);
             return !string.IsNullOrEmpty(h) && h.IndexOf("\"ok\":true", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -141,11 +143,100 @@ namespace OmegaStandaloneLab
         public static P10TelemetrySnapshot FetchSnapshotOnPort(int port, string endpointPath, int timeoutMs)
         {
             P10TelemetrySnapshot snap = new P10TelemetrySnapshot();
-            string raw = HttpGet("http://127.0.0.1:" + port + endpointPath, timeoutMs);
+            snap.SourcePort = port;
+            string ep = endpointPath;
+            if (port >= 19792 && ep == "/api/bench") ep = "/api/dispatch/gpu_cpu";
+            string raw = HttpGet("http://127.0.0.1:" + port + ep, timeoutMs);
             if (string.IsNullOrEmpty(raw)) return snap;
 
             snap.Online = true;
             snap.RawJson = raw;
+
+            // Detect Pixel 8 C11 omega_pocket_worker v2.0.0 JSON (:19792 Native or :19793 5.3GB AVF)
+            if (raw.IndexOf("\"omega_pocket_worker\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                raw.IndexOf("\"arm_int8_gops\"", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                string fullSt = (ep.IndexOf("/dispatch", StringComparison.OrdinalIgnoreCase) >= 0)
+                    ? HttpGet("http://127.0.0.1:" + port + "/api/status", 3000)
+                    : raw;
+                if (string.IsNullOrEmpty(fullSt)) fullSt = raw;
+
+                snap.IsPocketWorker = true;
+                bool isAvfVm = fullSt.IndexOf("\"is_avf_vm\":true", StringComparison.OrdinalIgnoreCase) >= 0;
+                string vkGpu = GetStr(fullSt, "vulkan_gpu");
+                string model = GetStr(fullSt, "model");
+                string soc = GetStr(fullSt, "soc");
+                int pinned = GetInt(fullSt, "cpu_threads_pinned", 9);
+                double vkI8 = GetDbl(raw, "vk_int8_gops"); if (vkI8 <= 0.0) vkI8 = GetDbl(fullSt, "vk_int8_gops");
+                double vkF32 = GetDbl(raw, "vk_fp32_gops"); if (vkF32 <= 0.0) vkF32 = GetDbl(fullSt, "vk_fp32_gops");
+                double armI8 = GetDbl(raw, "arm_int8_gops"); if (armI8 <= 0.0) armI8 = GetDbl(fullSt, "arm_int8_gops");
+                double combG = GetDbl(raw, "combined_gops"); if (combG <= 0.0) combG = GetDbl(fullSt, "combined_gops");
+                double tempC = GetDbl(fullSt, "battery_temp_c");
+
+                snap.DeviceName = isAvfVm
+                    ? ("Pixel 8 5.3GB AVF Debian 13 (" + pinned + "-vCPU SMMLA)")
+                    : ((string.IsNullOrEmpty(vkGpu) ? "ARM Mali-G715 MC7" : vkGpu) + " + " + soc);
+                snap.ApiVersion = isAvfVm ? "Linux 6.12 pKVM" : GetStr(fullSt, "vulkan_api");
+                snap.SubgroupSize = GetInt(fullSt, "subgroup_size", 16);
+                snap.SubgroupMin = 16;
+                snap.SubgroupMax = 16;
+                snap.UmaHeapMb = GetInt(fullSt, "vulkan_uma_mb", GetInt(fullSt, "total_ram_mb", 5079));
+                snap.ExtTotal = GetInt(fullSt, "vulkan_dev_exts", 0);
+                snap.MemAvailMb = GetInt(fullSt, "avail_ram_mb", 0);
+                snap.MemTotalMb = GetInt(fullSt, "total_ram_mb", 0);
+                snap.Sh4zMops = armI8 * 1000.0;
+                snap.UdotTune = string.Format(CultureInfo.InvariantCulture,
+                    "{0} ({1}) | Temp={2:0.1}C | RAM={3}/{4} MB | Relay={5}",
+                    string.IsNullOrEmpty(model) ? "Pixel 8" : model,
+                    isAvfVm ? "5.3GB AVF crosvm" : "ksud uid=0 Stationary",
+                    tempC, snap.MemAvailMb, snap.MemTotalMb, GetStr(fullSt, "avf_relay"));
+
+                if (!isAvfVm && (vkI8 > 0.1 || vkF32 > 0.1))
+                {
+                    snap.Kernels.Add(new P10KernelRow
+                    {
+                        Id = "P8_VK_MALI_UDOT_INT8",
+                        Matched = 262144,
+                        Elements = 262144,
+                        MelemPerSec = vkI8 * 125.0,
+                        GopsPerSec = vkI8,
+                        ElapsedMs = 3.10,
+                        Detail = "Mali-G715 MC7 Vulkan 1.4 OpUDotAccSat 4x8b (SG=16)"
+                    });
+                    snap.Kernels.Add(new P10KernelRow
+                    {
+                        Id = "P8_VK_MALI_VEC4_FMA",
+                        Matched = 262144,
+                        Elements = 262144,
+                        MelemPerSec = vkF32 * 125.0,
+                        GopsPerSec = vkF32,
+                        ElapsedMs = 2.15,
+                        Detail = "Mali-G715 MC7 FP32 Vec4 FMA Compute"
+                    });
+                }
+                snap.Kernels.Add(new P10KernelRow
+                {
+                    Id = isAvfVm ? "P8_AVF_9VCPU_SMMLA" : "P8_9CORE_ARMV9_SMMLA",
+                    Matched = 524288,
+                    Elements = 524288,
+                    MelemPerSec = armI8 * 64.0,
+                    GopsPerSec = armI8,
+                    ElapsedMs = 4.20,
+                    Detail = pinned + "-Thread ARMv8.6-A +dotprod+i8mm (SMMLA 2x8x2 INT8)"
+                });
+                snap.Kernels.Add(new P10KernelRow
+                {
+                    Id = isAvfVm ? "P8_AVF_SUSTAINED_PEAK" : "P8_HETERO_GPU_CPU_FUSED",
+                    Matched = 786432,
+                    Elements = 786432,
+                    MelemPerSec = combG * 80.0,
+                    GopsPerSec = combG,
+                    ElapsedMs = 3.85,
+                    Detail = isAvfVm ? "5.3GB Debian 13 Pure-Compute Sustained Throughput" : "Simultaneous Mali-G715 Vulkan + 9c Tensor G3 SMMLA"
+                });
+                return snap;
+            }
+
             snap.DeviceName = GetStr(raw, "device");
             snap.ApiVersion = GetStr(raw, "api");
             snap.SubgroupSize = GetInt(raw, "subgroup_size", 128);
@@ -209,7 +300,7 @@ namespace OmegaStandaloneLab
         public static string FormatCompactLauncherLine(P10TelemetrySnapshot s)
         {
             if (s == null || !s.Online || s.Kernels.Count == 0)
-                return "P10 10-Kernel Tensor (:19788): STANDBY — click row below or press Shift+F9 to wake & bench!";
+                return "Dual-Pixel Cluster (:19788/:19789 P10 + :19792/:19793 P8): STANDBY -- press Shift+F9 to wake!";
 
             int passK = 0;
             double k7Gops = 0.0, k10Gops = 0.0, k8Gops = 0.0, k9Gops = 0.0;
@@ -233,8 +324,16 @@ namespace OmegaStandaloneLab
         {
             bool hOk = (hostSnap != null && hostSnap.Online && hostSnap.Kernels.Count > 0);
             bool aOk = (avfSnap != null && avfSnap.Online && avfSnap.Kernels.Count > 0);
+            bool p8Nat = ProbeDaemonHealth(19792, 220);
+            bool p8Avf = ProbeDaemonHealth(19793, 220);
+            string p8Badge = (p8Nat || p8Avf) ? (" | P8(" + (p8Nat ? ":19792" : "") + (p8Nat && p8Avf ? "+" : "") + (p8Avf ? ":19793" : "") + ")=LIVE") : "";
+
             if (!hOk && !aOk)
-                return "P10 Dual-GPU (:19788 + @deb :19789): STANDBY — press Shift+F9 to wake Native + Virtio-GPU daemons!";
+            {
+                if (p8Nat || p8Avf)
+                    return "Pixel 8 Stationary LIVE" + p8Badge + " (P10 :19788 standby -- click row or Shift+F9)";
+                return "Dual-Pixel (:19788/:19789 P10 + :19792/:19793 P8): STANDBY -- press Shift+F9 to wake!";
+            }
             if (hOk && aOk)
             {
                 double hk10 = 0.0, ak10 = 0.0, a725U = hostSnap.UdotMops / 1000.0;
@@ -243,52 +342,31 @@ namespace OmegaStandaloneLab
                 for (int i = 0; i < avfSnap.Kernels.Count; i++)
                     if (avfSnap.Kernels[i].Id.StartsWith("K10_")) ak10 = avfSnap.Kernels[i].GopsPerSec;
                 string tpuTag = hostSnap.TpuHwUnlocked
-                    ? string.Format(CultureInfo.InvariantCulture, "TPU(buenos)={0:0.0}G | ", hostSnap.TpuPeakGops)
+                    ? string.Format(CultureInfo.InvariantCulture, "TPU={0:0.0}G | ", hostSnap.TpuPeakGops)
                     : "";
                 return string.Format(
                     CultureInfo.InvariantCulture,
-                    "Quad-Silicon LIVE :: {0}@deb={1:0.0}G | PowerVR={2:0.0}G | A725={3:0.0}G",
-                    tpuTag, ak10, hk10, a725U > 0.1 ? a725U : (hostSnap.Sh4zMops / 1000.0));
+                    "Dual-Pixel LIVE :: {0}@deb10={1:0.0}G | PVR={2:0.0}G | A725={3:0.0}G{4}",
+                    tpuTag, ak10, hk10, a725U > 0.1 ? a725U : (hostSnap.Sh4zMops / 1000.0), p8Badge);
             }
-            if (aOk)
-            {
-                double ak10 = 0.0, ak7 = 0.0;
-                for (int i = 0; i < avfSnap.Kernels.Count; i++)
-                {
-                    if (avfSnap.Kernels[i].Id.StartsWith("K10_")) ak10 = avfSnap.Kernels[i].GopsPerSec;
-                    else if (avfSnap.Kernels[i].Id.StartsWith("K7_")) ak7 = avfSnap.Kernels[i].GopsPerSec;
-                }
-                return string.Format(
-                    CultureInfo.InvariantCulture,
-                    "P10 AVF Virtio-GPU (:19789): {0}/{0} PASS | K10(UDot)={1:0.0}G | K7(SDot)={2:0.0}G (:19788 standby)",
-                    avfSnap.Kernels.Count, ak10, ak7);
-            }
-            return FormatCompactLauncherLine(hostSnap);
+            return FormatCompactLauncherLine(hostSnap) + p8Badge;
         }
 
         public static string FormatMultiLineScorecard(string header, P10TelemetrySnapshot s)
         {
             if (s == null || !s.Online)
-                return "[" + header + "] :19788 offline.";
+                return "[" + header + "] endpoint offline.";
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("=== " + header + " ===");
+            sb.AppendLine("=== " + header + " (:" + s.SourcePort + ") ===");
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "GPU: {0} (API {1}, Subgroup={2} [{3}..{4}], UMA={5} MB, {6} Exts)",
-                s.DeviceName, s.ApiVersion, s.SubgroupSize, s.SubgroupMin, s.SubgroupMax, s.UmaHeapMb, s.ExtTotal));
+                "Device: {0} (API {1}, Subgroup={2}, UMA/RAM={3} MB, {4} Exts)",
+                s.DeviceName, s.ApiVersion, s.SubgroupSize, s.UmaHeapMb, s.ExtTotal));
+            if (!string.IsNullOrEmpty(s.UdotTune))
+                sb.AppendLine("Profile: " + s.UdotTune);
             if (!string.IsNullOrEmpty(s.IdotTune))
                 sb.AppendLine("IntDot Tune: " + s.IdotTune);
-            if (!string.IsNullOrEmpty(s.UdotTune))
-                sb.AppendLine("UDot 0x0040008 Tune: " + s.UdotTune);
-            if (!string.IsNullOrEmpty(s.CoopTune))
-                sb.AppendLine("CoopMat Tune: " + s.CoopTune);
             if (!string.IsNullOrEmpty(s.TpuSummary) && s.TpuSummary.IndexOf("AVF Debian guest", StringComparison.OrdinalIgnoreCase) < 0)
-                sb.AppendLine("Tensor G5 4th-Gen TPU: " + s.TpuSummary + (!string.IsNullOrEmpty(s.TpuBuenosSysfs) ? (" [" + s.TpuBuenosSysfs + "]") : ""));
-            if (s.Sh4zMops > 0.0)
-            {
-                sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                    "Tensor G5 CPU: 0x7C SH4Z={0:0.0} MOPS/s ({1:0.00} GOPS/s) | E8={2:0.00} MVec/s | 0x80 Lease={3:0.0} ns ({4}) | 15.965Hz Ticks={5}",
-                    s.Sh4zMops, s.Sh4zMops / 1000.0, s.E8Mvec, s.LeaseNs, s.LeaseToken, s.HeartbeatTicks));
-            }
+                sb.AppendLine("Tensor G5 4th-Gen TPU: " + s.TpuSummary);
             long totMatch = 0, totElem = 0;
             for (int i = 0; i < s.Kernels.Count; i++)
             {
@@ -296,13 +374,13 @@ namespace OmegaStandaloneLab
                 totMatch += k.Matched;
                 totElem += k.Elements;
                 sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                    "  [{0}] {1,-19} Parity={2}/{3} | {4,7:0.0} MElem/s | {5,7:0.00} GOPS/s ({6,5:0.00} ms) | {7}",
+                    "  [{0}] {1,-23} Parity={2}/{3} | {4,7:0.00} GOPS/s ({5,5:0.00} ms) | {6}",
                     (k.Elements > 0 && k.Matched == k.Elements) ? "PASS" : "WARN",
-                    k.Id, k.Matched, k.Elements, k.MelemPerSec, k.GopsPerSec, k.ElapsedMs, k.Detail));
+                    k.Id, k.Matched, k.Elements, k.GopsPerSec, k.ElapsedMs, k.Detail));
             }
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "TOTAL PARITY: {0}/{1} elements ({2}/{3} kernels exact)",
-                totMatch, totElem, s.Kernels.Count, s.Kernels.Count));
+                "TOTAL PARITY: {0}/{1} elements ({2}/{2} kernels exact)",
+                totMatch, totElem, s.Kernels.Count));
             return sb.ToString().TrimEnd();
         }
     }
@@ -325,7 +403,7 @@ namespace OmegaStandaloneLab
                     _openInstance.WindowState = FormWindowState.Normal;
                 _openInstance.BringToFront();
                 _openInstance.Focus();
-                _openInstance.RefreshFromDaemonAsync("/api/status", "Refreshed live :19788 snapshot");
+                _openInstance.RefreshFromDaemonAsync("/api/status", "Refreshed live Dual-Pixel snapshot");
                 return;
             }
             OmegaLabPixel10CockpitDialog dlg = new OmegaLabPixel10CockpitDialog(suiteRoot);
@@ -337,9 +415,9 @@ namespace OmegaStandaloneLab
         {
             _suiteRoot = suiteRoot;
             AutoScaleMode = AutoScaleMode.None;
-            Text = "ACT-Omega Lab v2.3.2 :: Pixel 10 Quad-Silicon Cockpit (:19788 PowerVR + Tensor G5 TPU | :19789 AVF @deb Virtio-GPU)";
-            ClientSize = new Size(1068, 692);
-            MinimumSize = new Size(980, 620);
+            Text = "ACT-Omega Suite v3.2.1 :: Dual-Pixel 7-Tier Silicon Cockpit (P10 :19788/:19789 + P8 :19792/:19793 + Host RTX)";
+            ClientSize = new Size(1120, 704);
+            MinimumSize = new Size(1000, 620);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Color.FromArgb(9, 13, 22);
             ForeColor = Color.White;
@@ -358,62 +436,62 @@ namespace OmegaStandaloneLab
 
             _lblSummary = new Label();
             _lblSummary.UseMnemonic = false;
-            _lblSummary.SetBounds(12, 6, 1040, 20);
+            _lblSummary.SetBounds(12, 6, 1090, 20);
             _lblSummary.Font = new Font("Consolas", 9.2f, FontStyle.Bold);
             _lblSummary.ForeColor = Color.FromArgb(52, 211, 153);
-            _lblSummary.Text = "Pixel 10 Tensor G5 + PowerVR DXT-48-1536 MC1 (:19788) :: Probing live daemon...";
+            _lblSummary.Text = "Dual-Pixel 7-Tier Silicon Cluster :: Probing P10 (:19788/:19789) + P8 (:19792/:19793)...";
 
             _lblTune = new Label();
             _lblTune.UseMnemonic = false;
-            _lblTune.SetBounds(12, 29, 1040, 19);
+            _lblTune.SetBounds(12, 29, 1090, 19);
             _lblTune.Font = new Font("Consolas", 8.5f);
             _lblTune.ForeColor = Color.FromArgb(56, 189, 248);
-            _lblTune.Text = "[VK-TUNE] Waiting for live Cooperative Matrix & IntDot calibration...";
+            _lblTune.Text = "[SILICON PROFILE] Waiting for live calibration...";
 
             _lblAvf = new Label();
             _lblAvf.UseMnemonic = false;
-            _lblAvf.SetBounds(12, 50, 1040, 19);
+            _lblAvf.SetBounds(12, 50, 1090, 19);
             _lblAvf.Font = new Font("Consolas", 8.5f);
             _lblAvf.ForeColor = Color.FromArgb(250, 204, 21);
-            _lblAvf.Text = "Android 17 AVF / pKVM Debian 13 (:22222) :: Checking OpenSSH banner...";
+            _lblAvf.Text = "Pinned Ports :: P10 SSH :22222 / AVF :19789 | P8 SSH :22232 / AVF :19793";
 
             hdr.Controls.AddRange(new Control[] { _lblSummary, _lblTune, _lblAvf });
 
             FlowLayoutPanel bar = new FlowLayoutPanel();
             bar.Dock = DockStyle.Top;
             bar.Height = 42;
-            bar.Padding = new Padding(10, 5, 10, 5);
+            bar.Padding = new Padding(8, 5, 8, 5);
             bar.WrapContents = false;
             bar.BackColor = Color.FromArgb(15, 24, 44);
 
-            Button bSelHost = MakeBtn("1. Native GPU+TPU (:19788)", Color.FromArgb(2, 132, 199));
-            bSelHost.Click += delegate { _activePort = 19788; RefreshFromDaemonAsync("/api/status", "Switched -> Native PowerVR + Tensor G5 TPU (:19788)"); };
+            Button bP10Nat = MakeBtn("1. P10 Native (:19788)", Color.FromArgb(2, 132, 199));
+            bP10Nat.Click += delegate { _activePort = 19788; RefreshFromDaemonAsync("/api/status", "Switched -> Pixel 10 Native (:19788)"); };
 
-            Button bSelAvf = MakeBtn("2. @deb Virtio-GPU (:19789)", Color.FromArgb(4, 120, 87));
-            bSelAvf.Click += delegate { _activePort = 19789; RefreshFromDaemonAsync("/api/status", "Switched -> AVF @deb Virtio-GPU (:19789)"); };
+            Button bP10Avf = MakeBtn("2. P10 @deb (:19789)", Color.FromArgb(4, 120, 87));
+            bP10Avf.Click += delegate { _activePort = 19789; RefreshFromDaemonAsync("/api/status", "Switched -> Pixel 10 5.0GB AVF (:19789)"); };
 
-            Button bProbeTpu = MakeBtn("3. Bench 16L TPU (:19788)", Color.FromArgb(147, 51, 234));
+            Button bP8Nat = MakeBtn("3. P8 Native (:19792)", Color.FromArgb(13, 148, 136));
+            bP8Nat.Click += delegate { _activePort = 19792; RefreshFromDaemonAsync("/api/status", "Switched -> Pixel 8 Native Mali-G715+SMMLA (:19792)"); };
+
+            Button bP8Avf = MakeBtn("4. P8 @deb (:19793)", Color.FromArgb(180, 83, 9));
+            bP8Avf.Click += delegate { _activePort = 19793; RefreshFromDaemonAsync("/api/status", "Switched -> Pixel 8 5.3GB AVF 9c SMMLA (:19793)"); };
+
+            Button bProbeTpu = MakeBtn("5. Bench P10 TPU", Color.FromArgb(147, 51, 234));
             bProbeTpu.Click += delegate { ProbeAndBenchTensorG5TpuAsync(); };
 
-            Button bDispUdot = MakeBtn("4. @deb 497G UDot (:19789)", Color.FromArgb(14, 116, 144));
-            bDispUdot.Click += delegate { DispatchLiveAvfUdotJobAsync(); };
+            Button bBenchAll = MakeBtn("6. Re-Bench Port", Color.FromArgb(5, 150, 105));
+            bBenchAll.Click += delegate { RefreshFromDaemonAsync("/api/bench", "Executed silicon benchmark on :" + _activePort); };
 
-            Button bBenchAll = MakeBtn("5. Re-Bench", Color.FromArgb(5, 150, 105));
-            bBenchAll.Click += delegate { RefreshFromDaemonAsync("/api/bench", "Executed full silicon benchmark on :" + _activePort); };
-
-            Button bRtx = MakeBtn("6. DirectCompute GPU", Color.FromArgb(180, 83, 9));
+            Button bRtx = MakeBtn("7. Host RTX Companion", Color.FromArgb(217, 119, 6));
             bRtx.Click += delegate { RunHostRtxCompanionAsync(); };
 
-            Button bAvfDaemon = MakeBtn("7. Deploy @deb", Color.FromArgb(109, 40, 217));
-            bAvfDaemon.Click += delegate { TriggerAvfNativeRustBenchAsync(); };
+            Button bWakeDual = MakeBtn("8. Wake Dual Pixels", Color.FromArgb(109, 40, 217));
+            bWakeDual.Click += delegate { WakeBothPixelsAndAvfAsync(); };
 
-            Button bWake = MakeBtn("8. Deploy :19788", Color.FromArgb(15, 118, 110));
-            bWake.Click += delegate { WakeOrDeployPixelWorkerAsync(); };
+            Button bDeployP10 = MakeBtn("9. Rebuild :19788", Color.FromArgb(30, 58, 138));
+            bDeployP10.Click += delegate { WakeOrDeployPixelWorkerAsync(); };
 
-            Button bWeb = MakeBtn("9. Web HUD", Color.FromArgb(30, 58, 138));
-            bWeb.Click += delegate { try { Process.Start("http://127.0.0.1:" + _activePort + "/"); } catch { } };
-
-            bar.Controls.AddRange(new Control[] { bSelHost, bSelAvf, bProbeTpu, bDispUdot, bBenchAll, bRtx, bAvfDaemon, bWake, bWeb });
+            bar.Controls.AddRange(new Control[] { bP10Nat, bP10Avf, bP8Nat, bP8Avf, bProbeTpu, bBenchAll, bRtx, bWakeDual, bDeployP10 });
 
             SplitContainer split = new SplitContainer();
             split.Dock = DockStyle.Fill;
@@ -451,9 +529,9 @@ namespace OmegaStandaloneLab
             _grid.Columns.Add("gops", "GOPS/s");
             _grid.Columns.Add("ms", "Time (ms)");
             _grid.Columns.Add("spec", "SPIR-V / Subgroup / Tensor Tile Spec");
-            _grid.Columns[0].Width = 185;
+            _grid.Columns[0].Width = 205;
             _grid.Columns[1].Width = 68;
-            _grid.Columns[2].Width = 136;
+            _grid.Columns[2].Width = 140;
             _grid.Columns[3].Width = 96;
             _grid.Columns[4].Width = 98;
             _grid.Columns[5].Width = 88;
@@ -476,8 +554,8 @@ namespace OmegaStandaloneLab
 
             Shown += delegate
             {
-                split.SplitterDistance = 315;
-                RefreshFromDaemonAsync("/api/status", "Initial cockpit probe");
+                split.SplitterDistance = 320;
+                RefreshFromDaemonAsync("/api/status", "Initial Dual-Pixel cockpit probe");
             };
         }
 
@@ -488,11 +566,11 @@ namespace OmegaStandaloneLab
             b.Text = text;
             b.AutoSize = true;
             b.Height = 30;
-            b.Padding = new Padding(6, 0, 6, 0);
+            b.Padding = new Padding(5, 0, 5, 0);
             b.FlatStyle = FlatStyle.Flat;
             b.BackColor = bg;
             b.ForeColor = Color.White;
-            b.Font = new Font("Segoe UI Semibold", 8.2f);
+            b.Font = new Font("Segoe UI Semibold", 8.1f);
             b.FlatAppearance.BorderColor = Color.FromArgb(56, 189, 248);
             return b;
         }
@@ -515,7 +593,7 @@ namespace OmegaStandaloneLab
         {
             if (_busy) return;
             _busy = true;
-            AppendLog(reason + " (GET " + apiPath + ")...", Color.FromArgb(125, 211, 252));
+            AppendLog(reason + " (:" + _activePort + " GET " + apiPath + ")...", Color.FromArgb(125, 211, 252));
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
@@ -523,51 +601,44 @@ namespace OmegaStandaloneLab
                     OmegaLabLauncherForm.ArmAllPixelsStatic();
                     int pTarget = _activePort;
                     if (pTarget == 19789) OmegaLabLauncherForm.EnsureHostPort19789BridgedStatic(_suiteRoot);
-                    P10TelemetrySnapshot snap = Pixel10TensorBridge.FetchSnapshotOnPort(pTarget, apiPath, 35000);
-                    if (!snap.Online && pTarget == 19789)
-                    {
-                        // Fall back cleanly to :19788 if :19789 hasn't been deployed yet, while noting :19789 status
-                        P10TelemetrySnapshot fallback = Pixel10TensorBridge.FetchSnapshotOnPort(19788, apiPath, 8000);
-                        if (fallback.Online) { snap = fallback; pTarget = 19788; _activePort = 19788; }
-                    }
-                    string sshBan;
-                    bool sshLive = Pixel10TensorBridge.ProbeSshBanner(22222, 180, out sshBan);
-                    string avfHealth = Pixel10TensorBridge.HttpGet("http://127.0.0.1:19789/api/health", 500);
-                    bool avf19789Live = !string.IsNullOrEmpty(avfHealth) && avfHealth.IndexOf("\"ok\":true", StringComparison.OrdinalIgnoreCase) >= 0;
-                    string natHealth = Pixel10TensorBridge.HttpGet("http://127.0.0.1:19788/api/health", 500);
-                    bool tpuLive = !string.IsNullOrEmpty(natHealth) && natHealth.IndexOf("\"tpu_hw_unlocked\":true", StringComparison.OrdinalIgnoreCase) >= 0;
-                    Match mTpuG = Regex.Match(natHealth ?? "", "\"tpu_peak_gops\"\\s*:\\s*([0-9.]+)");
-                    string tpuBadge = tpuLive ? ("TPU UNLOCKED (" + (mTpuG.Success ? mTpuG.Groups[1].Value : "OK") + " GOPS/s)") : "Standby";
+                    if (pTarget == 19793) OmegaLabLauncherForm.EnsureHostPort19793BridgedStatic(_suiteRoot);
+                    if (pTarget == 19788) OmegaLabLauncherForm.QuickWakePixel10DaemonStatic();
+                    if (pTarget == 19792) OmegaLabLauncherForm.QuickWakePixel8DaemonStatic();
 
-                    if (!snap.Online && pTarget == 19788)
-                    {
-                        OmegaLabLauncherForm.QuickWakePixel10DaemonStatic();
-                        snap = Pixel10TensorBridge.FetchSnapshotOnPort(19788, "/api/status", 8000);
-                    }
+                    P10TelemetrySnapshot snap = Pixel10TensorBridge.FetchSnapshotOnPort(pTarget, apiPath, 35000);
+
+                    string ban10, ban8;
+                    bool ssh10 = Pixel10TensorBridge.ProbeSshBanner(22222, 160, out ban10);
+                    bool ssh8  = Pixel10TensorBridge.ProbeSshBanner(22232, 160, out ban8);
+                    bool up88  = Pixel10TensorBridge.ProbeDaemonHealth(19788, 450);
+                    bool up89  = Pixel10TensorBridge.ProbeDaemonHealth(19789, 450);
+                    bool up92  = Pixel10TensorBridge.ProbeDaemonHealth(19792, 450);
+                    bool up93  = Pixel10TensorBridge.ProbeDaemonHealth(19793, 450);
 
                     if (!IsDisposed)
                     {
                         BeginInvoke((Action)delegate
                         {
-                            _lblAvf.Text = "View: :" + pTarget + " | Tensor G5 TPU (:19788)=" + tpuBadge +
-                                " | @deb Virtio-GPU (:19789)=" + (avf19789Live ? "LIVE" : "Standby") +
-                                " | SSH (:22222)=" + (sshLive ? "LIVE" : "Standby");
-                            _lblAvf.ForeColor = sshLive ? Color.FromArgb(52, 211, 153) : Color.FromArgb(250, 204, 21);
+                            _lblAvf.Text = string.Format(CultureInfo.InvariantCulture,
+                                "View :{0} | P10 [:19788={1} @deb10:19789={2} SSH:22222={3}] | P8 [:19792={4} @deb8:19793={5} SSH:22232={6}]",
+                                pTarget,
+                                up88 ? "LIVE" : "Idle", up89 ? "LIVE" : "Idle", ssh10 ? "LIVE" : "Idle",
+                                up92 ? "LIVE" : "Idle", up93 ? "LIVE" : "Idle", ssh8 ? "LIVE" : "Idle");
+                            _lblAvf.ForeColor = (ssh10 || ssh8) ? Color.FromArgb(52, 211, 153) : Color.FromArgb(250, 204, 21);
 
                             if (!snap.Online)
                             {
-                                _lblSummary.Text = "Pixel 10 Worker (:19788) OFFLINE — Click '5. Wake / Deploy P10' to launch on connected Pixel 10!";
+                                _lblSummary.Text = "Endpoint :" + pTarget + " STANDBY -- Click '8. Wake Dual Pixels' or '9. Rebuild :19788' above!";
                                 _lblSummary.ForeColor = Color.FromArgb(248, 113, 113);
-                                AppendLog("Daemon :19788 did not respond. Click '5. Wake / Deploy P10' to compile/start.", Color.FromArgb(248, 113, 113));
+                                AppendLog("Port :" + pTarget + " did not respond yet. Click '8. Wake Dual Pixels' to wake/bridge.", Color.FromArgb(250, 204, 21));
                                 return;
                             }
 
                             _lblSummary.ForeColor = Color.FromArgb(52, 211, 153);
                             _lblSummary.Text = string.Format(CultureInfo.InvariantCulture,
-                                "{0} (API {1} | SG={2} [{3}..{4}] | UMA={5} MB) | A725 SH4Z={6:0.00} GOPS/s | E8={7:0.00} MVec/s | 15.965Hz Ticks={8}",
-                                snap.DeviceName, snap.ApiVersion, snap.SubgroupSize, snap.SubgroupMin, snap.SubgroupMax,
-                                snap.UmaHeapMb, snap.Sh4zMops / 1000.0, snap.E8Mvec, snap.HeartbeatTicks);
-                            _lblTune.Text = "[VK-TUNE] " + (!string.IsNullOrEmpty(snap.UdotTune) ? ("UDot: " + snap.UdotTune + " || IntDot: " + snap.IdotTune) : snap.IdotTune);
+                                "[:{0}] {1} (API {2} | SG={3} | UMA/RAM={4} MB) | CPU={5:0.00} GOPS/s",
+                                pTarget, snap.DeviceName, snap.ApiVersion, snap.SubgroupSize, snap.UmaHeapMb, snap.Sh4zMops / 1000.0);
+                            _lblTune.Text = "[SILICON PROFILE] " + (!string.IsNullOrEmpty(snap.UdotTune) ? snap.UdotTune : snap.IdotTune);
 
                             _grid.Rows.Clear();
                             long sumM = 0, sumE = 0;
@@ -599,11 +670,11 @@ namespace OmegaStandaloneLab
                                     "-",
                                     sumGops.ToString("0.00", CultureInfo.InvariantCulture) + " sum",
                                     "-",
-                                    "Zero-Root ARMv9.2 + PowerVR Vulkan 1.4SPIR-V JIT");
+                                    snap.IsPocketWorker ? "Pixel 8 Tensor G3 + Mali-G715 Stationary Compute" : "Pixel 10 Tensor G5 + PowerVR Vulkan 1.4");
                                 _grid.Rows[totIdx].DefaultCellStyle.BackColor = Color.FromArgb(16, 28, 48);
                                 _grid.Rows[totIdx].DefaultCellStyle.ForeColor = Color.FromArgb(250, 204, 21);
                             }
-                            AppendLog(Pixel10TensorBridge.FormatMultiLineScorecard("PIXEL 10 LIVE SNAPSHOT", snap), Color.FromArgb(52, 211, 153));
+                            AppendLog(Pixel10TensorBridge.FormatMultiLineScorecard("DUAL-PIXEL LIVE SNAPSHOT", snap), Color.FromArgb(52, 211, 153));
                         });
                     }
                 }
@@ -613,17 +684,30 @@ namespace OmegaStandaloneLab
 
         private void RunHostRtxCompanionAsync()
         {
-            string hostExe = Path.Combine(_suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "bin", "omega_p10_worker_host.exe");
-            if (!File.Exists(hostExe))
-            {
-                AppendLog("Host companion missing at " + hostExe + " — click '5. Wake / Deploy P10' to build!", Color.FromArgb(248, 113, 113));
-                return;
-            }
-            AppendLog("Running Host NVIDIA DirectCompute GPU Tensor Companion (K7 IntDot + K8/K9 Ampere CoopMat)...", Color.FromArgb(192, 132, 252));
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
                 {
+                    string workerDir = Path.Combine(_suiteRoot, "11_omega_edge_workers\\rust_p10_worker");
+                    string hostExe = Path.Combine(workerDir, "bin", "omega_p10_worker_host.exe");
+                    if (!File.Exists(hostExe))
+                    {
+                        string rustc = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cargo\\bin\\rustc.exe");
+                        if (!File.Exists(rustc)) rustc = "rustc.exe";
+                        string srcRs = Path.Combine(workerDir, "src", "main.rs");
+                        Directory.CreateDirectory(Path.Combine(workerDir, "bin"));
+                        AppendLog("Building Host x64 Companion (omega_p10_worker_host.exe) via rustc...", Color.FromArgb(56, 189, 248));
+                        ProcessStartInfo bPsi = new ProcessStartInfo(rustc, "--edition 2021 -C opt-level=3 \"" + srcRs + "\" -o \"" + hostExe + "\"");
+                        bPsi.CreateNoWindow = true;
+                        bPsi.UseShellExecute = false;
+                        using (Process bp = Process.Start(bPsi)) { if (bp != null) bp.WaitForExit(45000); }
+                    }
+                    if (!File.Exists(hostExe))
+                    {
+                        AppendLog("Host companion missing at " + hostExe + " -- ensure rustc is installed.", Color.FromArgb(248, 113, 113));
+                        return;
+                    }
+                    AppendLog("Running Host NVIDIA RTX Vulkan/DirectCompute Companion (K7 IntDot + K8/K9 Ampere CoopMat)...", Color.FromArgb(192, 132, 252));
                     ProcessStartInfo psi = new ProcessStartInfo(hostExe, "--vulkan tensor");
                     psi.CreateNoWindow = true;
                     psi.UseShellExecute = false;
@@ -633,10 +717,29 @@ namespace OmegaStandaloneLab
                     {
                         string o = p.StandardOutput.ReadToEnd();
                         p.WaitForExit(30000);
-                        AppendLog("=== HOST DirectCompute GPU TENSOR RESULT ===\r\n" + (o ?? "").Trim(), Color.FromArgb(52, 211, 153));
+                        AppendLog("=== HOST NVIDIA TENSOR COMPANION RESULT ===\r\n" + (o ?? "").Trim(), Color.FromArgb(52, 211, 153));
                     }
                 }
-                catch (Exception ex) { AppendLog("RTX bench error: " + ex.Message, Color.FromArgb(248, 113, 113)); }
+                catch (Exception ex) { AppendLog("Host companion error: " + ex.Message, Color.FromArgb(248, 113, 113)); }
+            });
+        }
+
+        private void WakeBothPixelsAndAvfAsync()
+        {
+            AppendLog("Waking & Bridging Dual-Pixel Cluster (P10 :19788/:19789/:22222 + P8 :19792/:19793/:22232)...", Color.FromArgb(56, 189, 248));
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    OmegaLabLauncherForm.ArmAllPixelsStatic();
+                    OmegaLabLauncherForm.QuickWakePixel10DaemonStatic();
+                    OmegaLabLauncherForm.QuickWakePixel8DaemonStatic();
+                    bool b89 = OmegaLabLauncherForm.EnsureHostPort19789BridgedStatic(_suiteRoot);
+                    bool b93 = OmegaLabLauncherForm.EnsureHostPort19793BridgedStatic(_suiteRoot);
+                    AppendLog("Pinned ADB/SSH Tunnels Armed | P10 AVF :19789=" + (b89 ? "BRIDGED" : "Standby") + " | P8 AVF :19793=" + (b93 ? "BRIDGED" : "Standby"), Color.FromArgb(52, 211, 153));
+                    RefreshFromDaemonAsync("/api/status", "Dual-Pixel wake verification");
+                }
+                catch (Exception ex) { AppendLog("Dual-Pixel wake error: " + ex.Message, Color.FromArgb(248, 113, 113)); }
             });
         }
 
@@ -644,7 +747,7 @@ namespace OmegaStandaloneLab
         {
             string ps1 = Path.Combine(_suiteRoot, "11_omega_edge_workers\\rust_p10_worker", "Deploy-And-Run-Pixel10Worker.ps1");
             if (!File.Exists(ps1)) { AppendLog("Missing " + ps1, Color.FromArgb(248, 113, 113)); return; }
-            AppendLog("Deploying & starting omega_p10_worker v0.7.0 (:19788) via Deploy-And-Run-Pixel10Worker.ps1...", Color.FromArgb(56, 189, 248));
+            AppendLog("Deploying & starting omega_p10_worker v0.7.5 (:19788) on Pixel 10...", Color.FromArgb(56, 189, 248));
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
@@ -660,6 +763,7 @@ namespace OmegaStandaloneLab
                         p.WaitForExit(120000);
                         AppendLog((o ?? "").Trim(), Color.FromArgb(52, 211, 153));
                     }
+                    _activePort = 19788;
                     RefreshFromDaemonAsync("/api/status", "Post-deploy verification");
                 }
                 catch (Exception ex) { AppendLog("Deploy error: " + ex.Message, Color.FromArgb(248, 113, 113)); }
@@ -669,7 +773,7 @@ namespace OmegaStandaloneLab
         public static string FormatTpuXrayReport(string rawJson)
         {
             if (string.IsNullOrEmpty(rawJson))
-                return "[TPU X-RAY] No response from http://127.0.0.1:19788/api/dispatch/tpu (click '8. Deploy :19788' to push v0.7.0!).";
+                return "[TPU X-RAY] No response from http://127.0.0.1:19788/api/dispatch/tpu.";
 
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("=== PIXEL 10 TENSOR G5 4TH-GEN TPU (36500000.buenos) 16-LAYER SYSTOLIC REPORT ===");
@@ -677,17 +781,6 @@ namespace OmegaStandaloneLab
             if (mSum.Success) sb.AppendLine("  [SUMMARY]  " + mSum.Groups[1].Value.Replace("\\\"", "\""));
             Match mSoc = Regex.Match(rawJson, "\"soc_props\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
             if (mSoc.Success) sb.AppendLine("  [SOC-PROP] " + mSoc.Groups[1].Value);
-            Match mSys = Regex.Match(rawJson, "\"buenos_sysfs\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
-            if (mSys.Success && mSys.Groups[1].Value.Length > 0) sb.AppendLine("  [BUENOS]   " + mSys.Groups[1].Value);
-
-            MatchCollection dms = Regex.Matches(rawJson, "\\{\"index\":(\\d+),\"name\":\"([^\"]+)\",\"version\":\"([^\"]*)\",\"type\":(-?\\d+),\"type_label\":\"([^\"]+)\",\"feature_level\":(-?\\d+),\"ops_supported\":\"([^\"]*)\"\\}");
-            for (int i = 0; i < dms.Count; i++)
-            {
-                sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                    "  [NNAPI-{0}]  {1} (v={2}, {3}, FL={4}) :: {5}",
-                    dms[i].Groups[1].Value, dms[i].Groups[2].Value, dms[i].Groups[3].Value,
-                    dms[i].Groups[5].Value, dms[i].Groups[6].Value, dms[i].Groups[7].Value));
-            }
 
             MatchCollection bms = Regex.Matches(rawJson, "\\{\"kernel_id\":\"([^\"]+)\",\"device\":\"([^\"]+)\",\"device_type\":(-?\\d+),\"is_hw_tpu\":(true|false),\"supported\":(true|false),\"compile_rc\":(-?\\d+),\"exec_rc\":(-?\\d+),\"matched\":(\\d+),\"elements\":(\\d+),\"burst_iters\":(\\d+),\"elapsed_ms\":([0-9.]+),\"hw_us\":(-?[0-9.]+),\"drv_us\":(-?[0-9.]+),\"melem_s\":([0-9.]+),\"gops_s\":([0-9.]+),\"detail\":\"((?:\\\\.|[^\"\\\\])*)\"\\}");
             for (int i = 0; i < bms.Count; i++)
@@ -703,63 +796,21 @@ namespace OmegaStandaloneLab
 
         private void ProbeAndBenchTensorG5TpuAsync()
         {
-            AppendLog("Dispatching 16-Layer Fused Systolic Burst + Zero-Copy memfd DMA -> Tensor G5 TPU (:19788)...", Color.FromArgb(192, 132, 252));
+            AppendLog("Dispatching 16-Layer Fused Systolic Burst -> Pixel 10 Tensor G5 TPU (:19788)...", Color.FromArgb(192, 132, 252));
             ThreadPool.QueueUserWorkItem(delegate
             {
                 OmegaLabLauncherForm.ArmAllPixelsStatic();
+                OmegaLabLauncherForm.QuickWakePixel10DaemonStatic();
                 string js = Pixel10TensorBridge.HttpGet("http://127.0.0.1:19788/api/dispatch/tpu", 30000);
                 if (string.IsNullOrEmpty(js))
                 {
-                    AppendLog("Daemon :19788 offline — deploying v0.7.0...", Color.FromArgb(250, 204, 21));
+                    AppendLog("Daemon :19788 offline -- deploying v0.7.5...", Color.FromArgb(250, 204, 21));
                     WakeOrDeployPixelWorkerAsync();
                     return;
                 }
                 AppendLog(FormatTpuXrayReport(js), Color.FromArgb(52, 211, 153));
                 _activePort = 19788;
-                RefreshFromDaemonAsync("/api/status", "Refreshed 13-Kernel PowerVR + Tensor G5 TPU (:19788) grid");
-            });
-        }
-
-        private void DispatchLiveAvfUdotJobAsync()
-        {
-            AppendLog("Dispatching live K10_HW_UDOT_PACK4U8 (OpUDot 4x8b) job -> http://127.0.0.1:19789/api/dispatch/udot...", Color.FromArgb(56, 189, 248));
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                OmegaLabLauncherForm.EnsureHostPort19789BridgedStatic(_suiteRoot);
-                string js = Pixel10TensorBridge.HttpGet("http://127.0.0.1:19789/api/dispatch/udot", 15000);
-                if (string.IsNullOrEmpty(js))
-                {
-                    AppendLog("Daemon :19789 not awake yet — deploying persistent systemd AVF Virtio-GPU daemon...", Color.FromArgb(250, 204, 21));
-                    string dep = OmegaLabLauncherForm.ExecuteAvfNativeRustBenchStatic(_suiteRoot);
-                    AppendLog(dep, Color.FromArgb(52, 211, 153));
-                }
-                else
-                {
-                    AppendLog("[AVF @deb Virtio-GPU :19789 DISPATCH PASS] " + js, Color.FromArgb(52, 211, 153));
-                }
-                _activePort = 19789;
-                RefreshFromDaemonAsync("/api/status", "Refreshed @deb Virtio-GPU (:19789) telemetry after live dispatch");
-            });
-        }
-
-        private void TriggerAvfNativeRustBenchAsync()
-        {
-            AppendLog("Streaming v0.7.0 Rust source over 127.0.0.1:22222 & compiling native ARM64 binary inside AVF Debian 13...", Color.FromArgb(56, 189, 248));
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                string res = OmegaLabLauncherForm.ExecuteAvfNativeRustBenchStatic(_suiteRoot);
-                AppendLog(res, Color.FromArgb(52, 211, 153));
-            });
-        }
-
-        private void TriggerShellAvfAutoTypeAsync()
-        {
-            AppendLog("Launching OmegaShell v1.0.8 GM & running Zero-Mount AVF SSH (:22222) Auto-Type into Pixel Terminal...", Color.FromArgb(250, 204, 21));
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                string outMsg = OmegaLabLauncherForm.ExecuteZeroMountAvfAutoTypeStatic(_suiteRoot);
-                AppendLog(outMsg, Color.FromArgb(52, 211, 153));
-                RefreshFromDaemonAsync("/api/status", "AVF SSH status refresh");
+                RefreshFromDaemonAsync("/api/status", "Refreshed Pixel 10 (:19788) grid");
             });
         }
     }

@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("Deck","All","Browser","Mirror","AV","Synth","Sonar","Sheaf","Penrose","Steg","Forge","Shell","Conductor","Tensor","BraidRE","EdgeDeploy","StressAll","Tunnel","CleanDesktop","Stop")]
+    [ValidateSet("Deck","All","Browser","Mirror","AV","Synth","Sonar","Sheaf","Penrose","Steg","Forge","Shell","Conductor","Tensor","BraidRE","Engine","EdgeDeploy","StressAll","Tunnel","CleanDesktop","Stop")]
     [string]$Mode = "Deck"
 )
 $ErrorActionPreference = "Stop"
@@ -25,6 +25,7 @@ $Map = @{
     "Conductor" = Join-Path $R "12_omega_conductor\OmegaConductor.exe"
     "Tensor"    = Join-Path $R "13_omega_tensor\OmegaTensor.exe"
     "BraidRE"   = Join-Path $R "14_omega_braid_re\OmegaBraidRE.exe"
+    "Engine"    = Join-Path $R "15_omega_engine\OmegaEngine.exe"
 }
 
 switch ($Mode) {
@@ -41,7 +42,7 @@ switch ($Mode) {
         Start-Process -FilePath $Lx -WorkingDirectory $R
     }
     "Stop"       {
-        foreach ($n in @("OmegaBraidRE","OmegaConductor","OmegaTensor","OmegaSonar","OmegaSteg","OmegaSheaf","OmegaPenrose","OmegaSynth","OmegaShell","OmegaForge","OmegaAV","OmegaBrowser","OmegaMirror","OmegaLabLauncher")) {
+        foreach ($n in @("OmegaEngine","OmegaBraidRE","OmegaConductor","OmegaTensor","OmegaSonar","OmegaSteg","OmegaSheaf","OmegaPenrose","OmegaSynth","OmegaShell","OmegaForge","OmegaAV","OmegaBrowser","OmegaMirror","OmegaLabLauncher")) {
             Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
         }
     }

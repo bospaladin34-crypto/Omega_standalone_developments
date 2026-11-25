@@ -159,7 +159,7 @@ namespace OmegaPocketSiliconFusion
             }
         }
 
-        // True HTTP /api/status Liveness Gate: defeats `adb forward` empty-tunnel TCP-SYN false positives!
+        // True HTTP /api/status Liveness Gate: defeats 'adb forward' empty-tunnel TCP-SYN false positives!
         public static bool ProbeDaemonHttpAlive(int port, int timeoutMs, out double rttMs, out string statusJson)
         {
             rttMs = 0.0;
@@ -238,14 +238,14 @@ namespace OmegaPocketSiliconFusion
             {
                 AdbDeviceRecord d = devs[i];
                 string sig = (d.Serial + " " + d.Model + " " + d.Product + " " + d.Codename + " " + d.SocName).ToLowerInvariant();
-                if (sig.Contains("shiba") || sig.Contains("pixel_8") || sig.Contains("pixel 8") || sig.Contains("zuma") || sig.Contains("g3"))
+                if (sig.Contains("3a121") || sig.Contains("shiba") || sig.Contains("pixel_8") || sig.Contains("pixel 8") || sig.Contains("zuma") || sig.Contains("tensor g3") || sig.Contains("slot1_tensorg3"))
                 {
                     d.IsPixel8Slot = true;
                     d.AssignedHostPort = 19792;
                     d.AssignedAvfPort = 19793;
                     secondaryClaimed = true;
                 }
-                else if (sig.Contains("frankel") || sig.Contains("pixel_10") || sig.Contains("pixel 10") || sig.Contains("laguna") || sig.Contains("g5"))
+                else if (sig.Contains("58170") || sig.Contains("frankel") || sig.Contains("pixel_10") || sig.Contains("pixel 10") || sig.Contains("laguna") || sig.Contains("tensor g5") || sig.Contains("slot0_tensorg5"))
                 {
                     d.IsPixel8Slot = false;
                     d.AssignedHostPort = 19788;
@@ -480,10 +480,19 @@ namespace OmegaPocketSiliconFusion
             RunQuickCli(adbExe, "-s " + s + " forward tcp:19793 tcp:19793", 900);
             RunQuickCli(adbExe, "-s " + s + " forward tcp:22232 tcp:2222", 900);
 
-            // 2. Push latest omega_pocket_worker.c & bootstrap_p8_avf_53gb.sh to /sdcard/Download & /sdcard/Download/linux
-            string workerC = Path.Combine(trackDir, "edge_worker", "omega_pocket_worker.c");
-            string bootSh = Path.Combine(trackDir, "edge_worker", "bootstrap_p8_avf_53gb.sh");
+            // 2. Resolve unified 11_omega_edge_workers\c11_universal_worker sources + shared Ed25519 key
+            string labRoot = OmegaPortableConfig.OmegaHardwareConfig.ResolveLabRoot();
+            string workerC = Path.Combine(labRoot, "11_omega_edge_workers\\c11_universal_worker", "omega_pocket_worker.c");
+            if (!File.Exists(workerC)) workerC = Path.Combine(trackDir, "edge_worker", "omega_pocket_worker.c");
+            string bootSh = Path.Combine(labRoot, "11_omega_edge_workers\\c11_universal_worker", "bootstrap_avf_debian.sh");
+            if (!File.Exists(bootSh)) bootSh = Path.Combine(trackDir, "edge_worker", "bootstrap_p8_avf_53gb.sh");
+            string pubKey = Path.Combine(labRoot, "10_omega_shell\\config\\ssh", "id_ed25519_omega.pub");
             RunQuickCli(adbExe, "-s " + s + " shell mkdir -p /sdcard/Download/linux", 1200);
+            if (File.Exists(pubKey))
+            {
+                RunQuickCli(adbExe, "-s " + s + " push \"" + pubKey + "\" /sdcard/Download/omega_rnd_ed25519.pub", 3000);
+                RunQuickCli(adbExe, "-s " + s + " push \"" + pubKey + "\" /sdcard/Download/linux/omega_rnd_ed25519.pub", 3000);
+            }
             if (File.Exists(workerC))
             {
                 RunQuickCli(adbExe, "-s " + s + " push \"" + workerC + "\" /sdcard/Download/omega_pocket_worker.c", 4000);

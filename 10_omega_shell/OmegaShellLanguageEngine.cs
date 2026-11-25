@@ -403,13 +403,14 @@ namespace OmegaShellStudio
             string verb = toks[0].ToLowerInvariant();
             string rawRest = stage.Length > toks[0].Length ? stage.Substring(toks[0].Length).Trim() : "";
 
-            if (verb == "@deb" || verb == "@avf" || verb == "@debian")
+            if (verb == "@deb" || verb == "@deb10" || verb == "@deb8" || verb == "@deb-all" || verb == "@avf" || verb == "@debian")
             {
                 rows = null;
-                text = AndroidAvfDebianBridge.RunCommandInPixelDebian(ShellRoot, Settings.DebianLinuxUser, rawRest, "");
+                string dTgt = (verb == "@deb8") ? "p8" : ((verb == "@deb-all") ? "both" : "p10");
+                text = AndroidAvfDebianBridge.RunCommandInPixelDebian(ShellRoot, Settings.DebianLinuxUser, rawRest, dTgt);
                 return;
             }
-            if (verb == "@p10" || verb == "@p10-sensor" || verb == "@p10-mid3" || verb == "@p10-mid2" || verb == "@p10-compute" || verb == "@p10-prime" || verb == "@p8" || verb == "@pixels")
+            if (verb == "@p10" || verb == "@p10-sensor" || verb == "@p10-mid3" || verb == "@p10-mid2" || verb == "@p10-compute" || verb == "@p10-prime" || verb == "@p8" || verb == "@p8-compute" || verb == "@p8-root" || verb == "@pixels")
             {
                 rows = null;
                 string defCmd = "uname -a && cat /proc/self/status | grep Cpus_allowed_list";
@@ -1179,6 +1180,7 @@ namespace OmegaShellStudio
                 catch (Exception ex) { text = "OmegaSec (:19786) RPC error: " + ex.Message; }
                 return;
             }
+            if (verb == "p8" || verb == "pixel8") { rows = null; string sub8 = (toks.Count >= 2 ? toks[1] : "status").ToLowerInvariant(); string a8 = toks.Count >= 3 ? toks[2] : ""; text = MeshAndLabBridge.ExecutePixel8WorkerVerb(sub8, a8, ShellRoot); return; }
             if (verb == "p10" || verb == "pixel10")
             {
                 rows = null;
@@ -1261,7 +1263,7 @@ namespace OmegaShellStudio
             else if (sub == "tunnel" || sub == "forward")
             {
                 rows = null;
-                text = AndroidAvfDebianBridge.ArmAdbSshTunnels("");
+                text = AndroidAvfDebianBridge.ArmAdbSshTunnels("both");
             }
             else if (sub == "sync" && toks.Count >= 3)
             {
@@ -1277,7 +1279,7 @@ namespace OmegaShellStudio
             else if (sub == "daemon" || sub == "virtio" || sub == "start-daemon")
             {
                 rows = null;
-                text = AndroidAvfDebianBridge.DeployAndStartPersistentAvfVirtioDaemon(ShellRoot, Settings.DebianLinuxUser, "");
+                string dArg = toks.Count >= 3 ? toks[2] : "both"; text = AndroidAvfDebianBridge.DeployAndStartPersistentAvfVirtioDaemon(ShellRoot, Settings.DebianLinuxUser, dArg);
             }
             else if (sub == "udot" || sub == "dispatch")
             {
@@ -1712,7 +1714,12 @@ namespace OmegaShellStudio
                 } catch { tpuSt = "DAEMON LIVE"; }
             }
             rows.Add(new OshRow().Set("node", "Edge: Tensor G5 4th-Gen TPU (:19788)").Set("status", tpuSt).Set("free_gb", 0.0).Set("endpoint", "36500000.buenos -> google-edgetpu (16L DMA)"));
-            rows.Add(new OshRow().Set("node", "Edge: Android AVF Debian (@deb)").Set("status", avfTun ? "SSH TUNNEL LIVE" : (px.Count > 0 ? "ADB READY" : "STANDBY")).Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:22222 -> :2222"));
+            bool p8Tcp; string p8Ban; bool p8AvfTun = AndroidAvfDebianBridge.ProbeSshBannerFast(22232, 120, out p8Tcp, out p8Ban);
+            rows.Add(new OshRow().Set("node", "Edge: Pixel 10 AVF Debian (@deb10)").Set("status", avfTun ? "SSH :22222 LIVE" : "STANDBY").Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:22222 -> :2222 (:19789)"));
+            rows.Add(new OshRow().Set("node", "Edge: Pixel 8 Native + 5.3GB AVF (@p8/@deb8)").Set("status", (MeshAndLabBridge.ProbePortFast(19792, 80) || MeshAndLabBridge.ProbePortFast(19793, 80) || p8AvfTun) ? "ONLINE (:19792/:19793/:22232)" : "STANDBY").Set("free_gb", 0.0).Set("endpoint", "Mali-G715+9c SMMLA + 5.3GB VM"));
+            rows.Add(new OshRow().Set("node", "Service: OmegaTensor v1.2.0 GM").Set("status", MeshAndLabBridge.ProbePortFast(19791, 80) ? "ONLINE (7-Tier)" : "OFFLINE").Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:19791"));
+            rows.Add(new OshRow().Set("node", "Service: OmegaBraidRE v1.4.0 GM").Set("status", MeshAndLabBridge.ProbePortFast(19794, 80) ? "ONLINE" : "OFFLINE").Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:19794"));
+            rows.Add(new OshRow().Set("node", "Service: OmegaEngine v1.2.3 GM").Set("status", MeshAndLabBridge.ProbePortFast(19795, 80) ? "ONLINE (Phase 2)" : "OFFLINE").Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:19795"));
             rows.Add(new OshRow().Set("node", "Service: OmegaMirror v0.9").Set("status", MeshAndLabBridge.ProbePortFast(19777, 80) ? "ONLINE" : "OFFLINE").Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:19777"));
             rows.Add(new OshRow().Set("node", "Service: OmegaBrowser v0.6.6").Set("status", MeshAndLabBridge.ProbePortFast(9778, 80) ? "ONLINE" : "OFFLINE").Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:9778"));
             rows.Add(new OshRow().Set("node", "Service: OmegaAV v0.7.1").Set("status", MeshAndLabBridge.ProbePortFast(19779, 80) ? "ONLINE" : "OFFLINE").Set("free_gb", 0.0).Set("endpoint", "127.0.0.1:19779"));

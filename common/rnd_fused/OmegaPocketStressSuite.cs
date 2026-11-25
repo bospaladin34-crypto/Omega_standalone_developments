@@ -135,7 +135,11 @@ namespace OmegaPocketSiliconFusion
             {
                 List<AdbDeviceRecord> recs = OmegaPocketCore.ParseAdbDevicesOutput(sample);
                 OmegaPocketCore.EnrichPhoneTelemetry(recs[1], "Tensor G3\n37\nshiba\n330\nMemTotal: 8325000 kB\nMemAvailable: 1331000 kB\nuid=0(root) gid=0(root)\nCROSVM_LIVE=1");
-                if (recs.Count == 4 &&
+                List<AdbDeviceRecord> rev = OmegaPocketCore.ParseAdbDevicesOutput(
+                    "List of devices attached\r\n3A121FDJH00BW5\tdevice\r\n58170DLCR0004V\tdevice\r\n");
+                bool revPinned = (rev.Count == 2 && rev[0].IsPixel8Slot && rev[0].AssignedHostPort == 19792 && rev[0].AssignedAvfPort == 19793 &&
+                                  !rev[1].IsPixel8Slot && rev[1].AssignedHostPort == 19788 && rev[1].AssignedAvfPort == 19789);
+                if (revPinned && recs.Count == 4 &&
                     recs[0].Serial == "MOCK_SLOT0_TENSORG5" && recs[0].AssignedHostPort == 19788 && recs[0].AssignedAvfPort == 19789 &&
                     recs[1].Serial == "MOCK_SLOT1_TENSORG3" && recs[1].IsPixel8Slot && recs[1].AssignedHostPort == 19792 &&
                     recs[1].AssignedAvfPort == 19793 && recs[1].HasRootUid0 && recs[1].CrosvmRunning &&

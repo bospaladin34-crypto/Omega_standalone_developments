@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v3.0.10",
+    [string]$Version = "v3.7.1",
     [string]$BaselineCommit = "",
     [switch]$SkipRebuild
 )
@@ -9,7 +9,7 @@ if ([string]::IsNullOrWhiteSpace($BaselineCommit)) {
     try {
         $BaselineCommit = (& git -C $RepoRoot rev-parse --short HEAD 2>$null | Out-String).Trim()
     } catch { }
-    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.0.10" }
+    if ([string]::IsNullOrWhiteSpace($BaselineCommit)) { $BaselineCommit = "v3.1.0" }
 }
 
 $DistDir  = Join-Path $RepoRoot "dist"
@@ -36,7 +36,7 @@ New-Item -ItemType Directory -Force -Path $StageDir | Out-Null
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 
-# 1. Stage all 14 compiled Windows x64 binaries (Deck + Stations 01..10, 12..14) in canonical layout
+# 1. Stage all 15 compiled Windows x64 binaries (Deck + Stations 01..10, 12..15) in canonical layout
 $RequiredBinaries = @(
     "OmegaLabLauncher.exe",
     "01_omega_mirror\OmegaMirror.exe",
@@ -51,7 +51,8 @@ $RequiredBinaries = @(
     "10_omega_shell\OmegaShell.exe",
     "12_omega_conductor\OmegaConductor.exe",
     "13_omega_tensor\OmegaTensor.exe",
-    "14_omega_braid_re\OmegaBraidRE.exe"
+    "14_omega_braid_re\OmegaBraidRE.exe",
+    "15_omega_engine\OmegaEngine.exe"
 )
 
 foreach ($relBin in $RequiredBinaries) {
@@ -105,6 +106,11 @@ if (Test-Path (Join-Path $RepoRoot "14_omega_braid_re\c11_cli\omega_braid_re_cli
     Copy-Item -Path (Join-Path $RepoRoot "14_omega_braid_re\c11_cli\omega_braid_re_cli.c") -Destination (Join-Path $StageDir "14_omega_braid_re\c11_cli\omega_braid_re_cli.c") -Force
 }
 
+if (Test-Path (Join-Path $RepoRoot "15_omega_engine\c11_cli\omega_tri_engine_audit.c")) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $StageDir "15_omega_engine\c11_cli") | Out-Null
+    Copy-Item -Path (Join-Path $RepoRoot "15_omega_engine\c11_cli\omega_tri_engine_audit.c") -Destination (Join-Path $StageDir "15_omega_engine\c11_cli\omega_tri_engine_audit.c") -Force
+}
+
 foreach ($emptyDir in @("downloads","corpus","bridge_export","workspace")) {
     New-Item -ItemType Directory -Force -Path (Join-Path $StageDir $emptyDir) | Out-Null
 }
@@ -137,7 +143,7 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($SumsPath, (($SumLines -join [string][char]10) + [string][char]10), $Utf8NoBom)
 
 $NotesLines = @(
-    "## Unified Omega Standalone & R&D Labs $Version GM (Windows x64 -- 14 Stations)",
+    "## Unified Omega Standalone & R&D Labs $Version GM (Windows x64 -- 15 Stations)",
     "",
     "**Verified Source Baseline:** '$BaselineCommit' on 'vesper_production'",
     "**Architecture:** Zero-NuGet Windows C# 5.0 ('csc.exe' x64) + Zero-Crate '#![no_std]' Rust ('19/19' invariant tests across 2 crates) + DirectCompute 'cs_5_0' + Universal C11 Edge & RE Engines",
