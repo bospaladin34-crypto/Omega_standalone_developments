@@ -9,6 +9,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using OmegaCommon;
 
 namespace OmegaTriEngine
@@ -93,6 +94,10 @@ namespace OmegaTriEngine
                 AddVec(sum, RunV38_WorldCameraWeatherAndThuumU13U19());
                 AddVec(sum, RunV39_SheafH1QuestGuardAndEslEsp(tempDir));
                 AddVec(sum, RunV40_CrossProcessSkse64AndReshadeMesh());
+                AddVec(sum, RunV41_Oteb512V2AndMenuAutoFade(tempDir));
+                AddVec(sum, RunV42_TopDiagBarAndHttpControlLoop(tempDir));
+                AddVec(sum, RunV43_Phase2PersonasAndMultiPassHdrFx());
+                AddVec(sum, RunV44_WaterElevationAndSpellChromaBus(tempDir));
                 AddVec(sum, RunV12_Sub70MbWorkingSetGate(out sum.TrimmedWorkingSetMb));
             }
             finally
@@ -429,10 +434,10 @@ namespace OmegaTriEngine
             string txt = Encoding.UTF8.GetString(raw);
             bool hasHeader = txt.IndexOf("#include \"ReShade.fxh\"", StringComparison.Ordinal) >= 0;
             bool hasTech   = txt.IndexOf("technique OmegaTriEngine", StringComparison.Ordinal) >= 0;
-            bool hasU19    = txt.IndexOf("uniform float4 U19", StringComparison.Ordinal) >= 0;
+            bool hasU19    = txt.IndexOf("uniform float4 U19", StringComparison.Ordinal) >= 0 && txt.IndexOf("uniform float4 U27", StringComparison.Ordinal) >= 0;
             bool noGpl     = txt.IndexOf("GPL-3.0", StringComparison.OrdinalIgnoreCase) < 0;
             v.Passed = (!hasBom && hasHeader && hasTech && hasU19 && noGpl && sha.Length == 64);
-            v.Detail = "ReShade.fxh + U0..U19 + No-BOM ok | SHA256=" + sha.Substring(0, 12);
+            v.Detail = "ReShade.fxh + U0..U27 + 28px HUD + No-BOM ok | SHA256=" + sha.Substring(0, 12);
             return v;
         }
 
@@ -2973,6 +2978,567 @@ namespace OmegaTriEngine
             {
                 FreeLibrary(hSkse);
                 FreeLibrary(hHost);
+            }
+        }
+
+
+        [DllImport("d3dcompiler_47.dll", CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+        private static extern int D3DCompile(
+            byte[] pSrcData,
+            UIntPtr srcDataSize,
+            string pSourceName,
+            IntPtr pDefines,
+            IntPtr pInclude,
+            string pEntrypoint,
+            string pTarget,
+            uint flags1,
+            uint flags2,
+            out IntPtr ppCode,
+            out IntPtr ppErrorMsgs);
+
+        private static string StripReshadeTopLevelAnnotations(string src)
+        {
+            if (string.IsNullOrEmpty(src)) return "";
+            StringBuilder sb = new StringBuilder(src.Length);
+            int i = 0;
+            int n = src.Length;
+            int braceDepth = 0;
+            bool inTopDecl = false;
+            while (i < n)
+            {
+                if (braceDepth == 0 && (i == 0 || src[i - 1] == '\n'))
+                {
+                    int k = i;
+                    while (k < n && (src[k] == ' ' || src[k] == '\t' || src[k] == '\r')) k++;
+                    if ((k + 8 <= n && string.CompareOrdinal(src, k, "uniform ", 0, 8) == 0) ||
+                        (k + 10 <= n && string.CompareOrdinal(src, k, "technique ", 0, 10) == 0) ||
+                        (k + 8 <= n && string.CompareOrdinal(src, k, "texture ", 0, 8) == 0) ||
+                        (k + 8 <= n && string.CompareOrdinal(src, k, "sampler ", 0, 8) == 0))
+                    {
+                        inTopDecl = true;
+                    }
+                }
+                char c = src[i];
+                if (c == '/' && (i + 1) < n && src[i + 1] == '/')
+                {
+                    while (i < n && src[i] != '\n') { sb.Append(src[i]); i++; }
+                    continue;
+                }
+                if (c == '/' && (i + 1) < n && src[i + 1] == '*')
+                {
+                    sb.Append(src[i]); sb.Append(src[i + 1]); i += 2;
+                    while (i < n && !(src[i] == '*' && (i + 1) < n && src[i + 1] == '/'))
+                    {
+                        sb.Append(src[i]); i++;
+                    }
+                    if (i < n) { sb.Append(src[i]); sb.Append(src[i + 1]); i += 2; }
+                    continue;
+                }
+                if (c == '"')
+                {
+                    sb.Append(c); i++;
+                    while (i < n)
+                    {
+                        if (src[i] == '\\' && (i + 1) < n)
+                        {
+                            sb.Append(src[i]); sb.Append(src[i + 1]); i += 2; continue;
+                        }
+                        sb.Append(src[i]);
+                        if (src[i] == '"') { i++; break; }
+                        i++;
+                    }
+                    continue;
+                }
+                if (inTopDecl && braceDepth == 0 && c == '<')
+                {
+                    i++;
+                    bool inStr = false;
+                    while (i < n)
+                    {
+                        char ac = src[i];
+                        if (inStr)
+                        {
+                            if (ac == '\\' && (i + 1) < n) { i += 2; continue; }
+                            if (ac == '"') inStr = false;
+                            i++;
+                            continue;
+                        }
+                        if (ac == '"') { inStr = true; i++; continue; }
+                        if (ac == '>') { i++; break; }
+                        i++;
+                    }
+                    continue;
+                }
+                if (c == '{')
+                {
+                    braceDepth++;
+                    inTopDecl = false;
+                }
+                else if (c == '}')
+                {
+                    if (braceDepth > 0) braceDepth--;
+                }
+                else if (c == ';' && braceDepth == 0)
+                {
+                    inTopDecl = false;
+                }
+                sb.Append(c);
+                i++;
+            }
+            return sb.ToString();
+        }
+
+        private static bool VerifySkyrimFxEntryPs50Compile(string fxRaw, string entryPoint, out int dxbcBytesOut, out string errOut)
+        {
+            dxbcBytesOut = 0;
+            errOut = "";
+            try
+            {
+                string hlsl = fxRaw.Replace("#include \"ReShade.fxh\"", "");
+                hlsl = hlsl.Replace("texture OmegaHdrHalfTex { Width = BUFFER_WIDTH / 2; Height = BUFFER_HEIGHT / 2; Format = RGBA16F; };", "");
+                hlsl = hlsl.Replace("sampler OmegaHdrHalfSamp { Texture = OmegaHdrHalfTex; };", "");
+                hlsl = StripReshadeTopLevelAnnotations(hlsl);
+                int techIdx = hlsl.IndexOf("technique OmegaTriEngine", StringComparison.Ordinal);
+                if (techIdx > 0) hlsl = hlsl.Substring(0, techIdx);
+                hlsl = hlsl.Replace("ReShade::GetLinearizedDepth(", "OmegaStubGetDepth(");
+                hlsl = hlsl.Replace("tex2D(ReShade::BackBuffer,", "OmegaStubTex2D(");
+                hlsl = hlsl.Replace("tex2D(OmegaHdrHalfSamp,", "OmegaStubHalfTex2D(");
+                string header =
+                    "#define BUFFER_WIDTH 1920.0\r\n" +
+                    "#define BUFFER_HEIGHT 1080.0\r\n" +
+                    "#define BUFFER_RCP_WIDTH (1.0 / 1920.0)\r\n" +
+                    "#define BUFFER_RCP_HEIGHT (1.0 / 1080.0)\r\n" +
+                    "Texture2D<float4> _StubBackTex : register(t0);\r\n" +
+                    "Texture2D<float4> _StubHalfTex : register(t1);\r\n" +
+                    "SamplerState _StubSamp : register(s0);\r\n" +
+                    "float OmegaStubGetDepth(float2 uv) { return saturate(uv.y * 0.85 + 0.05); }\r\n" +
+                    "float4 OmegaStubTex2D(float2 uv) { return _StubBackTex.SampleLevel(_StubSamp, uv, 0.0); }\r\n" +
+                    "float4 OmegaStubHalfTex2D(float2 uv) { return _StubHalfTex.SampleLevel(_StubSamp, uv, 0.0); }\r\n";
+                byte[] srcBytes = Encoding.ASCII.GetBytes(header + hlsl);
+                IntPtr pCode = IntPtr.Zero;
+                IntPtr pErr = IntPtr.Zero;
+                int hr = D3DCompile(srcBytes, (UIntPtr)srcBytes.Length, "OmegaTriEngine_SkyrimAE.fx", IntPtr.Zero, IntPtr.Zero, entryPoint, "ps_5_0", (1u << 15), 0u, out pCode, out pErr);
+                try
+                {
+                    if (hr < 0 || pCode == IntPtr.Zero)
+                    {
+                        if (pErr != IntPtr.Zero)
+                        {
+                            IntPtr vtbl = Marshal.ReadIntPtr(pErr);
+                            IntPtr fnPtr = Marshal.ReadIntPtr(vtbl, 3 * IntPtr.Size);
+                            FnBlobGetBufferPointer getPtr = (FnBlobGetBufferPointer)Marshal.GetDelegateForFunctionPointer(fnPtr, typeof(FnBlobGetBufferPointer));
+                            errOut = Marshal.PtrToStringAnsi(getPtr(pErr)) ?? ("HRESULT 0x" + hr.ToString("X8", CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            errOut = "HRESULT 0x" + hr.ToString("X8", CultureInfo.InvariantCulture);
+                        }
+                        return false;
+                    }
+                    IntPtr cVtbl = Marshal.ReadIntPtr(pCode);
+                    IntPtr fnSz = Marshal.ReadIntPtr(cVtbl, 4 * IntPtr.Size);
+                    FnBlobGetBufferSize getSz = (FnBlobGetBufferSize)Marshal.GetDelegateForFunctionPointer(fnSz, typeof(FnBlobGetBufferSize));
+                    dxbcBytesOut = (int)getSz(pCode).ToUInt64();
+                    return dxbcBytesOut > 512;
+                }
+                finally
+                {
+                    if (pCode != IntPtr.Zero) Marshal.Release(pCode);
+                    if (pErr != IntPtr.Zero) Marshal.Release(pErr);
+                }
+            }
+            catch (Exception ex)
+            {
+                errOut = ex.Message;
+                return false;
+            }
+        }
+
+        private static bool VerifySkyrimFxPs50Compile(string fxRaw, out int dxbcBytesOut, out string errOut)
+        {
+            return VerifySkyrimFxEntryPs50Compile(fxRaw, "PS_OmegaTriEngine", out dxbcBytesOut, out errOut);
+        }
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate IntPtr FnBlobGetBufferPointer(IntPtr pThis);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate UIntPtr FnBlobGetBufferSize(IntPtr pThis);
+
+        private sealed class MockReshadeRuntimeHarness28 : IDisposable
+        {
+            public readonly IntPtr VtableMem;
+            public readonly IntPtr RuntimeObj;
+            public readonly float[] Captured112 = new float[112];
+            public int EnumCallCount = 0;
+            public int SetFloatCallCount = 0;
+            public uint UpdatedSlotMask = 0u;
+
+            private readonly List<Delegate> _pinnedDelegates = new List<Delegate>();
+
+            public MockReshadeRuntimeHarness28()
+            {
+                VtableMem = Marshal.AllocHGlobal(40 * IntPtr.Size);
+                RuntimeObj = Marshal.AllocHGlobal(IntPtr.Size * 2);
+
+                VtblNoopDel noop = new VtblNoopDel(OnNoop);
+                _pinnedDelegates.Add(noop);
+                IntPtr pNoop = Marshal.GetFunctionPointerForDelegate(noop);
+                for (int i = 0; i < 40; i++)
+                {
+                    Marshal.WriteIntPtr(VtableMem, i * IntPtr.Size, pNoop);
+                }
+
+                VtblEnumUniformsDel fnEnum = new VtblEnumUniformsDel(OnEnumUniforms);
+                VtblGetAnnIntDel fnInt = new VtblGetAnnIntDel(OnGetAnnotationInt);
+                VtblGetAnnStrDel fnStr = new VtblGetAnnStrDel(OnGetAnnotationStr);
+                VtblSetFloatDel fnSetF = new VtblSetFloatDel(OnSetUniformFloat);
+                _pinnedDelegates.Add(fnEnum);
+                _pinnedDelegates.Add(fnInt);
+                _pinnedDelegates.Add(fnStr);
+                _pinnedDelegates.Add(fnSetF);
+
+                Marshal.WriteIntPtr(VtableMem, 19 * IntPtr.Size, Marshal.GetFunctionPointerForDelegate(fnEnum));
+                Marshal.WriteIntPtr(VtableMem, 25 * IntPtr.Size, Marshal.GetFunctionPointerForDelegate(fnInt));
+                Marshal.WriteIntPtr(VtableMem, 27 * IntPtr.Size, Marshal.GetFunctionPointerForDelegate(fnStr));
+                Marshal.WriteIntPtr(VtableMem, 33 * IntPtr.Size, Marshal.GetFunctionPointerForDelegate(fnSetF));
+                Marshal.WriteIntPtr(RuntimeObj, 0, VtableMem);
+            }
+
+            private void OnNoop(IntPtr pThis) { }
+
+            private void OnEnumUniforms(IntPtr pThis, IntPtr effectName, IntPtr callbackPtr, IntPtr userData)
+            {
+                EnumCallCount++;
+                EnumUniformCallbackDel cb = (EnumUniformCallbackDel)Marshal.GetDelegateForFunctionPointer(callbackPtr, typeof(EnumUniformCallbackDel));
+                for (int i = 0; i < 28; i++)
+                {
+                    cb(pThis, 0x9000UL + (ulong)i, userData);
+                }
+            }
+
+            private bool OnGetAnnotationInt(IntPtr pThis, ulong variable, IntPtr annName, IntPtr outValues, UIntPtr count, UIntPtr arrayIndex)
+            {
+                string name = Marshal.PtrToStringAnsi(annName) ?? "";
+                if (!string.Equals(name, "index", StringComparison.Ordinal)) return false;
+                if (variable < 0x9000UL || variable >= 0x901CUL) return false;
+                Marshal.WriteInt32(outValues, (int)(variable - 0x9000UL));
+                return true;
+            }
+
+            private bool OnGetAnnotationStr(IntPtr pThis, ulong variable, IntPtr annName, IntPtr outBuf, IntPtr ioSize)
+            {
+                string name = Marshal.PtrToStringAnsi(annName) ?? "";
+                if (!string.Equals(name, "source", StringComparison.Ordinal)) return false;
+                byte[] bytes = Encoding.ASCII.GetBytes("omega_tri_engine\0");
+                if (outBuf != IntPtr.Zero) Marshal.Copy(bytes, 0, outBuf, bytes.Length);
+                if (ioSize != IntPtr.Zero) Marshal.WriteIntPtr(ioSize, new IntPtr(bytes.Length));
+                return true;
+            }
+
+            private void OnSetUniformFloat(IntPtr pThis, ulong variable, IntPtr floatValues, UIntPtr count, UIntPtr arrayIndex)
+            {
+                if (variable < 0x9000UL || variable >= 0x901CUL) return;
+                int slot = (int)(variable - 0x9000UL);
+                Marshal.Copy(floatValues, Captured112, slot * 4, 4);
+                UpdatedSlotMask |= (1u << slot);
+                SetFloatCallCount++;
+            }
+
+            public void Dispose()
+            {
+                GC.KeepAlive(_pinnedDelegates);
+                if (RuntimeObj != IntPtr.Zero) Marshal.FreeHGlobal(RuntimeObj);
+                if (VtableMem != IntPtr.Zero) Marshal.FreeHGlobal(VtableMem);
+            }
+        }
+
+        private static EngineStressVector RunV41_Oteb512V2AndMenuAutoFade(string tempDir)
+        {
+            EngineStressVector v = new EngineStressVector();
+            v.Code = "V41_OTEB_512B_V2_AND_MENU_FADE";
+            v.Trials = 256;
+
+            string addonPath = OmegaEngineHlslAndReshade.FindCompiledAddon64Path();
+            if (string.IsNullOrEmpty(addonPath) || !File.Exists(addonPath))
+            {
+                v.Detail = "Missing OmegaTriEngine.addon64";
+                return v;
+            }
+
+            IntPtr hMod = LoadLibraryW(addonPath);
+            if (hMod == IntPtr.Zero)
+            {
+                v.Detail = "LoadLibraryW failed on OmegaTriEngine.addon64";
+                return v;
+            }
+
+            try
+            {
+                IntPtr pInject = GetProcAddress(hMod, "OmegaAddonInjectRuntime");
+                IntPtr pReset  = GetProcAddress(hMod, "OmegaAddonResetCache");
+                if (pInject == IntPtr.Zero || pReset == IntPtr.Zero)
+                {
+                    v.Detail = "Missing OmegaAddonInjectRuntime or OmegaAddonResetCache";
+                    return v;
+                }
+                FnOmegaAddonInjectRuntime fnInject = (FnOmegaAddonInjectRuntime)Marshal.GetDelegateForFunctionPointer(pInject, typeof(FnOmegaAddonInjectRuntime));
+                FnOmegaAddonResetCache fnReset = (FnOmegaAddonResetCache)Marshal.GetDelegateForFunctionPointer(pReset, typeof(FnOmegaAddonResetCache));
+                fnReset();
+
+                string mapName = "Local\\OmegaOteb512_V41_" + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
+                OmegaEngineArenaState st = new OmegaEngineArenaState(tempDir);
+                using (OmegaTriEngineUniformBus bus = new OmegaTriEngineUniformBus(mapName))
+                using (OmegaTopBarController tb = new OmegaTopBarController(st, bus))
+                using (MockReshadeRuntimeHarness28 mock28 = new MockReshadeRuntimeHarness28())
+                {
+                    float[] u80 = BuildCanonicalTestUniforms(2560, 1440, 12.5f, 4);
+                    ulong seq; uint crc;
+                    bus.PublishSnapshot(u80, OmegaTriEngineUniformBus.MaskSkse64Bridge, out seq, out crc);
+
+                    tb.HasSimulatedMenuOverride = true;
+                    tb.SimulatedMenuOpenOverride = true;
+                    for (int s = 0; s < 13; s++) tb.StepTick(0.020f);
+                    float fadedAlpha = tb.CurrentMenuFadeAlpha;
+
+                    tb.SetSymmetryExplicit(6);
+                    tb.CycleAuroraGain();
+                    uint pushedA = fnInject(mock28.RuntimeObj, mapName);
+                    Thread.Sleep(2);
+                    uint pushedB = fnInject(mock28.RuntimeObj, mapName);
+
+                    tb.SimulatedMenuOpenOverride = false;
+                    for (int s = 0; s < 15; s++) tb.StepTick(0.020f);
+                    float restoredAlpha = tb.CurrentMenuFadeAlpha;
+
+                    bool slotsOk = (pushedA == 28u && pushedB == 28u && mock28.UpdatedSlotMask == 0x0FFFFFFFu);
+                    bool v2SentOk = Math.Abs(mock28.Captured112[108] - 180.0f) < 0.5f;
+                    bool symOvOk  = Math.Abs(mock28.Captured112[104] - 6.0f) < 0.01f;
+                    bool fadeOk   = (fadedAlpha < 0.16f && restoredAlpha > 0.94f);
+                    bool qpcFpsOk = (mock28.Captured112[100] > 1.0f && mock28.Captured112[101] > 0.05f);
+
+                    string fxSrc = OmegaEngineHlslAndReshade.GetCanonicalSkyrimAeWorldShaderFx();
+                    int psBytes;
+                    string psErr;
+                    bool psDxbcOk = VerifySkyrimFxPs50Compile(fxSrc, out psBytes, out psErr);
+                    if (!psDxbcOk)
+                    {
+                        v.Detail = "PS_OmegaTriEngine ps_5_0 compile failed: " + psErr;
+                        return v;
+                    }
+
+                    v.Passed = slotsOk && v2SentOk && symOvOk && fadeOk && qpcFpsOk && psDxbcOk;
+                    v.Detail = string.Format(CultureInfo.InvariantCulture,
+                        "512B OTRI v1.8 -> {0}/28 float4s | 250ms Fade 1.0->{1:0.00}->1.0 | PS_5_0={2} B DXBC",
+                        pushedB, fadedAlpha, psBytes);
+                    return v;
+                }
+            }
+            finally
+            {
+                FreeLibrary(hMod);
+            }
+        }
+
+        private static EngineStressVector RunV42_TopDiagBarAndHttpControlLoop(string tempDir)
+        {
+            EngineStressVector v = new EngineStressVector();
+            v.Code = "V42_TOP_DIAG_BAR_AND_HOTKEY_BUS";
+            v.Trials = 64;
+
+            int freePort = 0;
+            TcpListener probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            freePort = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+
+            string mapName = "Local\\OmegaTopBar_V42_" + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
+            OmegaEngineArenaState state = new OmegaEngineArenaState(tempDir);
+            using (OmegaTriEngineUniformBus bus = new OmegaTriEngineUniformBus(mapName))
+            using (OmegaTopBarController ctrl = new OmegaTopBarController(state, bus))
+            using (OmegaTopDiagBarForm form = new OmegaTopDiagBarForm(ctrl))
+            using (OmegaEngineHttpServer srv = new OmegaEngineHttpServer(state))
+            {
+                state.SharedTopBar = ctrl;
+                IntPtr hForm = form.Handle;
+                int exInteractive = form.CurrentExStyle;
+                bool hasNoActivate = (exInteractive & 0x08000000) != 0;
+                bool hasTopMost    = (exInteractive & 0x00000008) != 0;
+
+                form.ApplyClickThroughStyle(true);
+                int exClickThru = form.CurrentExStyle;
+                bool hasTransparent = (exClickThru & 0x00000020) != 0;
+                form.ApplyClickThroughStyle(false);
+                bool clearedTransparent = (form.CurrentExStyle & 0x00000020) == 0;
+
+                bool b0 = form.SimulateButtonClickForAudit(0);
+                bool afterBypass = !ctrl.ShaderMasterEnabled;
+                bool b0b = form.SimulateButtonClickForAudit(0);
+                bool b1 = form.SimulateButtonClickForAudit(1);
+                bool b6 = form.SimulateButtonClickForAudit(6);
+
+                srv.Start(freePort, true);
+                string rTop = HttpGetLocal(freePort, "/api/topbar?sym=5&menufade=1&thuum=1");
+                bool httpOk = rTop.IndexOf("\"oteb_bytes\":512", StringComparison.Ordinal) >= 0
+                           && rTop.IndexOf("\"symmetry_override\":5", StringComparison.Ordinal) >= 0
+                           && rTop.IndexOf("\"shader_master_on\":true", StringComparison.Ordinal) >= 0;
+
+                v.Passed = (hForm != IntPtr.Zero && hasNoActivate && hasTopMost && hasTransparent && clearedTransparent && b0 && afterBypass && b0b && b1 && b6 && httpOk);
+                v.Detail = string.Format(CultureInfo.InvariantCulture,
+                    "28px TopBar (WS_EX_NOACTIVATE+LAYERED+ALT_F1 click-thru ok) | 9 buttons + /api/topbar :{0} ok",
+                    freePort);
+                return v;
+            }
+        }
+
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate uint FnOmegaSksePushWaterAndSpellState(float waterZSkyrimUnits, uint spellSchoolId, float spellStrength, IntPtr mapNameUtf16);
+
+        private static EngineStressVector RunV43_Phase2PersonasAndMultiPassHdrFx()
+        {
+            EngineStressVector v = new EngineStressVector();
+            v.Code = "V43_PHASE2_PERSONAS_AND_MULTIPASS_HDR";
+            v.Trials = 256;
+
+            string fx = OmegaEngineHlslAndReshade.GetCanonicalSkyrimAeWorldShaderFx();
+            bool hasHalfTex = fx.IndexOf("Format = RGBA16F;", StringComparison.Ordinal) >= 0
+                           && fx.IndexOf("pass P0_HalfHdr", StringComparison.Ordinal) >= 0
+                           && fx.IndexOf("pass P1_Composite", StringComparison.Ordinal) >= 0;
+            bool hasAllPersonas = fx.IndexOf("Obsidian Dark Fantasy", StringComparison.Ordinal) >= 0
+                               && fx.IndexOf("Liminal Dreamcore", StringComparison.Ordinal) >= 0
+                               && fx.IndexOf("Stark Nihilist Monolith", StringComparison.Ordinal) >= 0;
+
+            string[] bannedWords = new string[] { "half", "half2", "half3", "half4", "sample", "SamplerState", "Texture2D", "double", "inline", "register", "packoffset" };
+            bool lexerClean = (fx.IndexOf('?') < 0);
+            for (int b = 0; b < bannedWords.Length; b++)
+            {
+                // Simple token boundary check outside comments/strings
+                if (System.Text.RegularExpressions.Regex.IsMatch(fx, "\\b" + bannedWords[b] + "\\b"))
+                {
+                    lexerClean = false;
+                    v.Detail = "Reserved ReShadeFX keyword detected: " + bannedWords[b];
+                    return v;
+                }
+            }
+
+            int preBytes, compBytes;
+            string preErr, compErr;
+            bool okPre = VerifySkyrimFxEntryPs50Compile(fx, "PS_OmegaHdrHalfPrepass", out preBytes, out preErr);
+            if (!okPre)
+            {
+                v.Detail = "PS_OmegaHdrHalfPrepass ps_5_0 failed: " + preErr;
+                return v;
+            }
+            bool okComp = VerifySkyrimFxEntryPs50Compile(fx, "PS_OmegaTriEngine", out compBytes, out compErr);
+            if (!okComp)
+            {
+                v.Detail = "PS_OmegaTriEngine ps_5_0 failed: " + compErr;
+                return v;
+            }
+
+            v.Passed = hasHalfTex && hasAllPersonas && lexerClean && okPre && okComp;
+            v.Detail = string.Format(CultureInfo.InvariantCulture,
+                "4 Personas (Sovn/Dark/Drmc/Nihl) + RGBA16F P0={0}B & P1={1}B DXBC (0 lexer collisions)",
+                preBytes, compBytes);
+            return v;
+        }
+
+        private static EngineStressVector RunV44_WaterElevationAndSpellChromaBus(string tempDir)
+        {
+            EngineStressVector v = new EngineStressVector();
+            v.Code = "V44_WATER_ELEVATION_AND_SPELL_BUS";
+            v.Trials = 256;
+
+            string sksePath = OmegaEngineHlslAndReshade.FindCompiledSkseBridgeDllPath();
+            string addonPath = OmegaEngineHlslAndReshade.FindCompiledAddon64Path();
+            if (string.IsNullOrEmpty(sksePath) || !File.Exists(sksePath) || string.IsNullOrEmpty(addonPath) || !File.Exists(addonPath))
+            {
+                v.Detail = "Missing compiled SKSE64 or Addon64 DLL";
+                return v;
+            }
+
+            int freePort = 0;
+            TcpListener probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            freePort = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+
+            IntPtr hSkse = LoadLibraryW(sksePath);
+            IntPtr hAddon = LoadLibraryW(addonPath);
+            if (hSkse == IntPtr.Zero || hAddon == IntPtr.Zero)
+            {
+                if (hSkse != IntPtr.Zero) FreeLibrary(hSkse);
+                if (hAddon != IntPtr.Zero) FreeLibrary(hAddon);
+                v.Detail = "LoadLibraryW failed on SKSE64 or Addon64";
+                return v;
+            }
+
+            try
+            {
+                IntPtr pPush = GetProcAddress(hSkse, "OmegaSksePushWaterAndSpellState");
+                IntPtr pInject = GetProcAddress(hAddon, "OmegaAddonInjectRuntime");
+                IntPtr pReset = GetProcAddress(hAddon, "OmegaAddonResetCache");
+                if (pPush == IntPtr.Zero || pInject == IntPtr.Zero || pReset == IntPtr.Zero)
+                {
+                    v.Detail = "Missing OmegaSksePushWaterAndSpellState or Addon exports";
+                    return v;
+                }
+                FnOmegaSksePushWaterAndSpellState fnPush = (FnOmegaSksePushWaterAndSpellState)Marshal.GetDelegateForFunctionPointer(pPush, typeof(FnOmegaSksePushWaterAndSpellState));
+                FnOmegaAddonInjectRuntime fnInject = (FnOmegaAddonInjectRuntime)Marshal.GetDelegateForFunctionPointer(pInject, typeof(FnOmegaAddonInjectRuntime));
+                FnOmegaAddonResetCache fnReset = (FnOmegaAddonResetCache)Marshal.GetDelegateForFunctionPointer(pReset, typeof(FnOmegaAddonResetCache));
+                fnReset();
+
+                string mapName = "Local\\OmegaPhase2_V44_" + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
+                OmegaEngineArenaState st = new OmegaEngineArenaState(tempDir);
+                using (OmegaTriEngineUniformBus bus = new OmegaTriEngineUniformBus(mapName))
+                using (OmegaTopBarController ctrl = new OmegaTopBarController(st, bus))
+                using (OmegaTopDiagBarForm form = new OmegaTopDiagBarForm(ctrl))
+                using (OmegaEngineHttpServer srv = new OmegaEngineHttpServer(st))
+                using (MockReshadeRuntimeHarness28 mock28 = new MockReshadeRuntimeHarness28())
+                {
+                    st.SharedTopBar = ctrl;
+                    float[] u80 = BuildCanonicalTestUniforms(1920, 1080, 9.0f, 1);
+                    ulong seq; uint crc;
+                    bus.PublishSnapshot(u80, OmegaTriEngineUniformBus.MaskSkse64Bridge, out seq, out crc);
+
+                    bool bPer = form.SimulateButtonClickForAudit(7); // Cycles Persona 0 -> 1 (Obsidian Dark Fantasy)
+                    srv.Start(freePort, true);
+                    string rHttp = HttpGetLocal(freePort, "/api/topbar?persona=2&bloom=1.40&spell=3&waterz=-1.25");
+                    bool httpOk = rHttp.IndexOf("\"aesthetic_persona\":2", StringComparison.Ordinal) >= 0
+                               && rHttp.IndexOf("\"spell_school\":3", StringComparison.Ordinal) >= 0;
+
+                    IntPtr pMapWide = Marshal.StringToHGlobalUni(mapName);
+                    uint skRc;
+                    try
+                    {
+                        // -100.0 Skyrim units * 0.01428 = -1.428 meters, spell school 2 (Frost), strength 1.35
+                        skRc = fnPush(-100.0f, 2u, 1.35f, pMapWide);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(pMapWide);
+                    }
+
+                    uint pushed = fnInject(mock28.RuntimeObj, mapName);
+                    // U20 starts at float index 80; U21 starts at float index 84
+                    bool personaOk = Math.Abs(mock28.Captured112[80] - 2.0f) < 0.01f && Math.Abs(mock28.Captured112[83] - 1.40f) < 0.02f;
+                    bool waterSpellOk = (skRc == 1u)
+                                     && Math.Abs(mock28.Captured112[84] - (-1.428f)) < 0.02f
+                                     && Math.Abs(mock28.Captured112[86] - 2.0f) < 0.01f
+                                     && Math.Abs(mock28.Captured112[87] - 1.35f) < 0.02f;
+
+                    v.Passed = bPer && httpOk && (pushed == 28u) && personaOk && waterSpellOk;
+                    v.Detail = string.Format(CultureInfo.InvariantCulture,
+                        "U20 Persona=2 (Dreamcore, HDR=1.40x) + SKSE64 U21 Water={0:0.3}m Spell=2(Frost) -> 28/28 slots ok",
+                        mock28.Captured112[84]);
+                    return v;
+                }
+            }
+            finally
+            {
+                FreeLibrary(hSkse);
+                FreeLibrary(hAddon);
             }
         }
 

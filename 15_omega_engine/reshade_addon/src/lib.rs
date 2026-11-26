@@ -1,14 +1,14 @@
 #![no_std]
 #![allow(unknown_lints, linker_messages)]
 // =============================================================================
-// OmegaTriEngine.addon64 v1.7.7 - Zero-CRT #![no_std] Win64 ReShade Add-on DLL
+// OmegaTriEngine.addon64 v1.9.0 - Zero-CRT #![no_std] Win64 ReShade Add-on DLL
 // SPDX-License-Identifier: BSD-3-Clause OR MIT
 // Zero external crates. Zero MSVC CRT (imports ONLY KERNEL32.dll).
 // Verified against ReShade 6.8.0 (API v20) reshade_api.hpp & namespacereshade:
 //   - reshade::api::effect_runtime inherits device_object -> api_object ONLY
 //     (NOT swapchain! Exact vtable slots across 5.x & 6.0..6.8+: [19/22/25/27/33])
-//   - Hooks destroy_effect_runtime (11), reshade_begin_effects (86), and
-//     reshade_reloaded_effects (88) to purge cached uniform handles on reset/reload
+//   - Supports both 384B (U0..U19) and 512B OTRI v1.8 (U0..U27 + TopBar + MenuFade)
+//   - Measures microsecond Skyrim AE FPS & frametime via QueryPerformanceCounter
 // =============================================================================
 
 use core::ffi::c_void;
@@ -114,7 +114,7 @@ pub static OMEGA_ADDON_EXPORT_NAME: ExportCStr = ExportCStr(b"OmegaTriEngine\0".
 
 #[no_mangle]
 pub static OMEGA_ADDON_EXPORT_DESC: ExportCStr = ExportCStr(
-    b"Zero-CRT Win64 ReShade Add-on v1.7.7 streaming 384B Local\\OmegaTriEngineUniforms into U0..U19 (exact effect_runtime vtable[19/22/25/27/33]).\0"
+    b"Zero-CRT Win64 ReShade Add-on v1.9.0 streaming 512B Local\\OmegaTriEngineUniforms into U0..U27 + live QPC FPS (vtable[19/22/25/27/33]).\0"
         .as_ptr(),
 );
 
@@ -134,9 +134,13 @@ pub static OMEGA_ADDON_EXPORT_AUTHOR: ExportCStr =
 
 const FILE_MAP_WRITE: u32 = 0x0002;
 const FILE_MAP_READ: u32 = 0x0004;
-const TOTAL_MAP_BYTES: usize = 384;
 const UNIFORM_BYTES: usize = 320;
+const EXT_OFFSET: usize = 384;
+const EXT_BYTES: usize = 128;
+const MAX_U_SLOTS: usize = 28;
+const MAX_FLOATS: usize = 112;
 const MAGIC_OTRI: u32 = 0x4F54_5249;
+const CONTRACT_V180: u32 = 0x0001_0800;
 const DLL_PROCESS_DETACH: u32 = 0;
 const DLL_PROCESS_ATTACH: u32 = 1;
 const EV_DESTROY_EFFECT_RUNTIME: u32 = 11;
@@ -157,6 +161,8 @@ extern "system" {
     fn GetModuleHandleW(module_name: *const u16) -> *mut c_void;
     fn GetProcAddress(module: *mut c_void, proc_name: *const u8) -> *mut c_void;
     fn GetTickCount64() -> u64;
+    fn QueryPerformanceCounter(lp_performance_count: *mut i64) -> i32;
+    fn QueryPerformanceFrequency(lp_frequency: *mut i64) -> i32;
     fn GetCurrentProcess() -> *mut c_void;
     fn GetProcessHeap() -> *mut c_void;
     fn HeapAlloc(heap: *mut c_void, flags: u32, bytes: usize) -> *mut c_void;
@@ -174,22 +180,18 @@ type FnReShadeUnregisterAddon = unsafe extern "C" fn(*mut c_void);
 type FnReShadeRegisterEvent = unsafe extern "C" fn(u32, *const c_void);
 type FnReShadeUnregisterEvent = unsafe extern "C" fn(u32, *const c_void);
 
-// Exact reshade::api::effect_runtime pure virtual methods (inherits device_object -> api_object ONLY):
-// [19] = enumerate_uniform_variables
 type FnEnumerateUniforms = unsafe extern "C" fn(
     runtime: *mut ReShadeEffectRuntime,
     effect_name: *const u8,
     callback: unsafe extern "C" fn(*mut ReShadeEffectRuntime, u64, *mut c_void),
     user_data: *mut c_void,
 );
-// [22] = get_uniform_variable_name
 type FnGetUniformName = unsafe extern "C" fn(
     runtime: *const ReShadeEffectRuntime,
     variable: u64,
     name: *mut u8,
     name_size: *mut usize,
 );
-// [25] = get_annotation_int_from_uniform_variable
 type FnGetAnnotationInt = unsafe extern "C" fn(
     runtime: *const ReShadeEffectRuntime,
     variable: u64,
@@ -198,7 +200,6 @@ type FnGetAnnotationInt = unsafe extern "C" fn(
     count: usize,
     array_index: usize,
 ) -> bool;
-// [27] = get_annotation_string_from_uniform_variable
 type FnGetAnnotationString = unsafe extern "C" fn(
     runtime: *const ReShadeEffectRuntime,
     variable: u64,
@@ -206,7 +207,6 @@ type FnGetAnnotationString = unsafe extern "C" fn(
     value: *mut u8,
     value_size: *mut usize,
 ) -> bool;
-// [33] = set_uniform_value_float
 type FnSetUniformFloat = unsafe extern "C" fn(
     runtime: *mut ReShadeEffectRuntime,
     variable: u64,
@@ -234,31 +234,56 @@ static G_CACHED_RUNTIME: AtomicPtr<ReShadeEffectRuntime> = AtomicPtr::new(ptr::n
 static G_CACHE_DIRTY: AtomicBool = AtomicBool::new(true);
 static G_FRAME_COUNTER: AtomicU32 = AtomicU32::new(0);
 static G_EMPTY_RETRY_TICK: AtomicU32 = AtomicU32::new(0);
+static G_LAST_QPC: AtomicU64 = AtomicU64::new(0);
+static G_QPC_FREQ: AtomicU64 = AtomicU64::new(0);
+static G_EMA_FPS_BITS: AtomicU32 = AtomicU32::new(0x4270_0000);
+static G_EMA_MS_BITS: AtomicU32 = AtomicU32::new(0x4185_5555);
 
-static G_LAST_SNAP_BITS: [AtomicU32; 80] = [
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
-];
+macro_rules! atomic_u32_112 {
+    () => {
+        [
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+            AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0), AtomicU32::new(0),
+        ]
+    };
+}
 
-static G_CACHED_VARS: [AtomicU64; 20] = [
-    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
-    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
-    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
-    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+static G_LAST_SNAP_BITS: [AtomicU32; MAX_FLOATS] = atomic_u32_112!();
+
+static G_CACHED_VARS: [AtomicU64; MAX_U_SLOTS] = [
+    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
 ];
 
 static DEFAULT_MMF_UTF16: [u16; 29] = [
@@ -289,10 +314,45 @@ unsafe fn purge_cached_uniform_handles() {
     G_CACHE_DIRTY.store(true, Ordering::Release);
     G_CACHED_RUNTIME.store(ptr::null_mut(), Ordering::Release);
     let mut k = 0usize;
-    while k < 20 {
+    while k < MAX_U_SLOTS {
         (*G_CACHED_VARS.as_ptr().add(k)).store(0, Ordering::Release);
         k += 1;
     }
+}
+
+#[inline]
+unsafe fn sample_qpc_fps_and_ms() -> (f32, f32) {
+    let mut freq = G_QPC_FREQ.load(Ordering::Relaxed);
+    if freq == 0 {
+        let mut fq_i64: i64 = 0;
+        if QueryPerformanceFrequency(&mut fq_i64) != 0 && fq_i64 > 1000 {
+            freq = fq_i64 as u64;
+            G_QPC_FREQ.store(freq, Ordering::Relaxed);
+        }
+    }
+    let mut now_i64: i64 = 0;
+    if freq > 0 && QueryPerformanceCounter(&mut now_i64) != 0 && now_i64 > 0 {
+        let now_u64 = now_i64 as u64;
+        let prev = G_LAST_QPC.swap(now_u64, Ordering::AcqRel);
+        if prev > 0 && now_u64 > prev {
+            let dt_sec = ((now_u64 - prev) as f32) / (freq as f32);
+            if dt_sec >= 0.0002 && dt_sec <= 1.0 {
+                let inst_fps = 1.0 / dt_sec;
+                let inst_ms = dt_sec * 1000.0;
+                let prev_fps = f32::from_bits(G_EMA_FPS_BITS.load(Ordering::Relaxed));
+                let prev_ms = f32::from_bits(G_EMA_MS_BITS.load(Ordering::Relaxed));
+                let ema_fps = prev_fps * 0.85 + inst_fps * 0.15;
+                let ema_ms = prev_ms * 0.85 + inst_ms * 0.15;
+                G_EMA_FPS_BITS.store(ema_fps.to_bits(), Ordering::Relaxed);
+                G_EMA_MS_BITS.store(ema_ms.to_bits(), Ordering::Relaxed);
+                return (ema_fps, ema_ms);
+            }
+        }
+    }
+    (
+        f32::from_bits(G_EMA_FPS_BITS.load(Ordering::Relaxed)),
+        f32::from_bits(G_EMA_MS_BITS.load(Ordering::Relaxed)),
+    )
 }
 
 #[inline]
@@ -327,9 +387,6 @@ pub fn map_api_version_to_events(api_ver: u32) -> (u32, u32) {
 
 #[inline]
 pub fn vtable_delta_for_api(_api_ver: u32) -> usize {
-    // Verified against crosire/reshade reshade_api.hpp:
-    // reshade::api::effect_runtime inherits device_object -> api_object ONLY (NOT swapchain!).
-    // Slots [19/22/25/27/33] are invariant across ReShade 5.x and 6.0..6.8+ (API v8..v24).
     0
 }
 
@@ -359,6 +416,9 @@ unsafe fn parse_u_slot_name(buf: *const u8) -> i32 {
     }
     if b1 == b'1' && b2 >= b'0' && b2 <= b'9' && *buf.add(3) == 0 {
         return 10 + ((b2 - b'0') as i32);
+    }
+    if b1 == b'2' && b2 >= b'0' && b2 <= b'7' && *buf.add(3) == 0 {
+        return 20 + ((b2 - b'0') as i32);
     }
     -1
 }
@@ -427,7 +487,7 @@ unsafe fn open_view_for_name(utf16_name: *const u16) -> (*mut c_void, *mut u8, b
         return (ptr::null_mut(), ptr::null_mut(), false);
     }
     let access = if writable { FILE_MAP_READ | FILE_MAP_WRITE } else { FILE_MAP_READ };
-    let view = MapViewOfFile(h, access, 0, 0, TOTAL_MAP_BYTES);
+    let view = MapViewOfFile(h, access, 0, 0, 0);
     if view.is_null() {
         CloseHandle(h);
         return (ptr::null_mut(), ptr::null_mut(), false);
@@ -435,14 +495,15 @@ unsafe fn open_view_for_name(utf16_name: *const u16) -> (*mut c_void, *mut u8, b
     (h, view, writable)
 }
 
-unsafe fn read_seqlock_from_view(view: *mut u8, writable: bool, out_floats80: *mut f32) -> bool {
-    if view.is_null() || out_floats80.is_null() {
+unsafe fn read_seqlock_from_view(view: *mut u8, writable: bool, out_floats112: *mut f32) -> bool {
+    if view.is_null() || out_floats112.is_null() {
         return false;
     }
     let seq_ptr = view.add(328) as *const AtomicU64;
     let magic_ptr = view.add(320) as *const u32;
+    let ver_ptr = view.add(324) as *const u32;
     let crc_ptr = view.add(340) as *const u32;
-    let dst_bytes = out_floats80 as *mut u8;
+    let dst_bytes = out_floats112 as *mut u8;
 
     let mut attempt = 0usize;
     while attempt < 16 {
@@ -458,13 +519,34 @@ unsafe fn read_seqlock_from_view(view: *mut u8, writable: bool, out_floats80: *m
             b += 1;
         }
         let magic = ptr::read_volatile(magic_ptr);
+        let contract_ver = ptr::read_volatile(ver_ptr);
         let expected_crc = ptr::read_volatile(crc_ptr);
+        if contract_ver >= CONTRACT_V180 {
+            let mut eb = 0usize;
+            while eb < EXT_BYTES {
+                *dst_bytes.add(UNIFORM_BYTES + eb) = ptr::read_volatile(view.add(EXT_OFFSET + eb));
+                eb += 1;
+            }
+        } else {
+            let mut z = 80usize;
+            while z < MAX_FLOATS {
+                *out_floats112.add(z) = 0.0;
+                z += 1;
+            }
+        }
         let s2 = (*seq_ptr).load(Ordering::Acquire);
         if s1 == s2 && magic == MAGIC_OTRI {
             if crc32_ieee_ptr(dst_bytes as *const u8, UNIFORM_BYTES) == expected_crc {
+                let (ema_fps, ema_ms) = sample_qpc_fps_and_ms();
+                if contract_ver >= CONTRACT_V180 {
+                    *out_floats112.add(100) = ema_fps;
+                    *out_floats112.add(101) = ema_ms;
+                    *out_floats112.add(108) = 180.0;
+                    *out_floats112.add(110) = 1.0;
+                }
                 let mut k = 0usize;
-                while k < 80 {
-                    let bits = (*out_floats80.add(k)).to_bits();
+                while k < MAX_FLOATS {
+                    let bits = (*out_floats112.add(k)).to_bits();
                     (*G_LAST_SNAP_BITS.as_ptr().add(k)).store(bits, Ordering::Relaxed);
                     k += 1;
                 }
@@ -480,6 +562,14 @@ unsafe fn read_seqlock_from_view(view: *mut u8, writable: bool, out_floats80: *m
                     }
                     (*addon_frm).fetch_add(1, Ordering::AcqRel);
                     (*addon_tick).store(tick32, Ordering::Release);
+                    if contract_ver >= CONTRACT_V180 {
+                        let fps_atom = view.add(EXT_OFFSET + 80) as *const AtomicU32;
+                        let ms_atom = view.add(EXT_OFFSET + 84) as *const AtomicU32;
+                        let rsl_atom = view.add(EXT_OFFSET + 120) as *const AtomicU32;
+                        (*fps_atom).store(ema_fps.to_bits(), Ordering::Release);
+                        (*ms_atom).store(ema_ms.to_bits(), Ordering::Release);
+                        (*rsl_atom).store(1.0f32.to_bits(), Ordering::Release);
+                    }
                 }
                 return true;
             }
@@ -514,7 +604,7 @@ unsafe extern "C" fn enum_uniform_cb(
         if cstr_eq_omega_tri_engine(src_buf.as_ptr()) {
             let mut idx: i32 = -1;
             if get_int(runtime, variable, b"index\0".as_ptr(), &mut idx, 1, 0) {
-                if idx >= 0 && idx < 20 {
+                if idx >= 0 && (idx as usize) < MAX_U_SLOTS {
                     (*G_CACHED_VARS.as_ptr().add(idx as usize)).store(variable, Ordering::Release);
                     return;
                 }
@@ -522,20 +612,19 @@ unsafe extern "C" fn enum_uniform_cb(
         }
     }
 
-    // Fallback: bind unannotated "U0".."U19" uniforms via get_uniform_variable_name (vtbl[22])
     let get_name: FnGetUniformName = core::mem::transmute(*vtbl.add(22 + delta));
     let mut name_buf = [0u8; 16];
     let mut name_len: usize = 16;
     get_name(runtime, variable, name_buf.as_mut_ptr(), &mut name_len);
     let slot = parse_u_slot_name(name_buf.as_ptr());
-    if slot >= 0 && slot < 20 {
+    if slot >= 0 && (slot as usize) < MAX_U_SLOTS {
         let cell = &*G_CACHED_VARS.as_ptr().add(slot as usize);
         let _ = cell.compare_exchange(0, variable, Ordering::AcqRel, Ordering::Relaxed);
     }
 }
 
-unsafe fn inject_uniforms_into_runtime(runtime: *mut ReShadeEffectRuntime, floats80: *const f32) -> u32 {
-    if runtime.is_null() || (*runtime).vtable.is_null() || floats80.is_null() {
+unsafe fn inject_uniforms_into_runtime(runtime: *mut ReShadeEffectRuntime, floats112: *const f32) -> u32 {
+    if runtime.is_null() || (*runtime).vtable.is_null() || floats112.is_null() {
         return 0;
     }
     let delta = vtable_delta_for_api(G_NEGOTIATED_API.load(Ordering::Relaxed));
@@ -545,7 +634,7 @@ unsafe fn inject_uniforms_into_runtime(runtime: *mut ReShadeEffectRuntime, float
 
     if need_refresh {
         let mut k = 0usize;
-        while k < 20 {
+        while k < MAX_U_SLOTS {
             (*G_CACHED_VARS.as_ptr().add(k)).store(0, Ordering::Relaxed);
             k += 1;
         }
@@ -558,10 +647,10 @@ unsafe fn inject_uniforms_into_runtime(runtime: *mut ReShadeEffectRuntime, float
     let set_float: FnSetUniformFloat = core::mem::transmute(*vtbl.add(33 + delta));
     let mut pushed = 0u32;
     let mut i = 0usize;
-    while i < 20 {
+    while i < MAX_U_SLOTS {
         let var_h = (*G_CACHED_VARS.as_ptr().add(i)).load(Ordering::Acquire);
         if var_h != 0 {
-            set_float(runtime, var_h, floats80.add(i * 4), 4, 0);
+            set_float(runtime, var_h, floats112.add(i * 4), 4, 0);
             pushed += 1;
         }
         i += 1;
@@ -602,7 +691,7 @@ unsafe extern "C" fn on_reshade_begin_effects(
     if view.is_null() {
         return;
     }
-    let mut snap = [0.0f32; 80];
+    let mut snap = [0.0f32; MAX_FLOATS];
     if read_seqlock_from_view(view, G_MAP_WRITABLE.load(Ordering::Relaxed), snap.as_mut_ptr()) {
         let _ = inject_uniforms_into_runtime(runtime, snap.as_ptr());
     }
@@ -738,7 +827,7 @@ pub unsafe extern "C" fn OmegaAddonInjectRuntime(
     if G_NEGOTIATED_API.load(Ordering::Relaxed) == 0 {
         G_NEGOTIATED_API.store(20, Ordering::Relaxed);
     }
-    let mut snap = [0.0f32; 80];
+    let mut snap = [0.0f32; MAX_FLOATS];
     let mut count = 0u32;
     if read_seqlock_from_view(v, w, snap.as_mut_ptr()) {
         count = inject_uniforms_into_runtime(runtime, snap.as_ptr());
@@ -755,6 +844,19 @@ pub unsafe extern "C" fn OmegaAddonReadLastSnapshot80(out_floats80: *mut f32) ->
         while i < 80 {
             let bits = (*G_LAST_SNAP_BITS.as_ptr().add(i)).load(Ordering::Relaxed);
             *out_floats80.add(i) = f32::from_bits(bits);
+            i += 1;
+        }
+    }
+    G_FRAME_COUNTER.load(Ordering::Relaxed)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn OmegaAddonReadLastSnapshot112(out_floats112: *mut f32) -> u32 {
+    if !out_floats112.is_null() {
+        let mut i = 0usize;
+        while i < MAX_FLOATS {
+            let bits = (*G_LAST_SNAP_BITS.as_ptr().add(i)).load(Ordering::Relaxed);
+            *out_floats112.add(i) = f32::from_bits(bits);
             i += 1;
         }
     }

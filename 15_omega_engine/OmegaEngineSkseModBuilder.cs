@@ -903,7 +903,7 @@ namespace OmegaTriEngine
                 "<fomod>\r\n" +
                 "  <Name>Omega Tri-Engine World-Space Shader &amp; SKSE64 Bridge</Name>\r\n" +
                 "  <Author>ACT-Omega Unified Labs</Author>\r\n" +
-                "  <Version>1.7.7</Version>\r\n" +
+                "  <Version>1.9.0</Version>\r\n" +
                 "  <Description>Zero-CRT SKSE64 world-space camera/weather/Thu'um uniform streamer + ESL plugin + H^1=0 Spectre dungeon quest guard (MIT).</Description>\r\n" +
                 "</fomod>\r\n";
 
@@ -934,7 +934,7 @@ namespace OmegaTriEngine
             }
             vortexEntries.Add(new KeyValuePair<string, byte[]>("fomod/info.xml", utf8NoBom.GetBytes(fomodInfoXml)));
 
-            res.VortexZipPath = Path.Combine(exportsDir, "OmegaTriEngine_SkyrimAE_SKSE64_v1.7.7_Vortex.zip");
+            res.VortexZipPath = Path.Combine(exportsDir, "OmegaTriEngine_SkyrimAE_SKSE64_v1.9.0_Vortex.zip");
             CreateZipArchivePure(res.VortexZipPath, vortexEntries);
 
             // 5. Companion Game-Root ReShade bundle (ReShade.fxh + .fx + Preset.ini + .addon64)
@@ -957,7 +957,7 @@ namespace OmegaTriEngine
             {
                 rootEntries.Add(new KeyValuePair<string, byte[]>("OmegaTriEngine.addon64", File.ReadAllBytes(res.ReshadeAddonPath)));
             }
-            res.RootReshadeZipPath = Path.Combine(exportsDir, "OmegaTriEngine_SkyrimAE_RootReShade_v1.7.7.zip");
+            res.RootReshadeZipPath = Path.Combine(exportsDir, "OmegaTriEngine_SkyrimAE_RootReShade_v1.9.0.zip");
             CreateZipArchivePure(res.RootReshadeZipPath, rootEntries);
 
             // Optional direct sync into Skyrim AE root + Data directory

@@ -2350,26 +2350,30 @@ void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, 
         public static string GetCanonicalSkyrimAeWorldShaderFx()
         {
             return @"// =============================================================================
-// OmegaTriEngine_SkyrimAE.fx (Suite v3.7.1 / Station 15 OmegaEngine v1.7.7)
-// SPDX-License-Identifier: BSD-3-Clause OR MIT (Zero GPL code)
-// Verified against crosire/reshade source/effect_lexer.cpp + effect_parser:
-//   - Eliminates reserved HLSL/Cg keywords 'half4' and 'half2' (kHalf4 / kHalf2)
-//   - Zero scalar-to-vector ternary (?:) operators, zero bitwise integer ops
-//   - Zero constructor initializers on special source=""omega_tri_engine"" uniforms
-//   - Top-level unconditional BackBuffer & DepthBuffer sampling
+// OmegaTriEngine_SkyrimAE.fx (Suite v3.9.0 / Station 15 OmegaEngine v1.9.0)
+// SPDX-License-Identifier: BSD-3-Clause OR MIT
+// Phase 2: 512B OTRI v1.9 Bus (U0..U27) + 28px Top-Screen Live Diagnostics Strip
+// + 4 Aesthetic Personas (Classic Sovngarde / Obsidian Dark Fantasy / Liminal
+//   Dreamcore / Stark Nihilist Monolith) + Multi-Pass Half-Res RGBA16F HDR
+//   Dual-Kawase Bloom & Depth-Bilateral Godrays + Water-Plane & Spell Coupling
+// Zero ReShadeFX reserved words, zero bitwise int ops, zero vector ternaries.
 // =============================================================================
+
 #include ""ReShade.fxh""
 
-uniform float4 U0 < source = ""omega_tri_engine""; index = 0; >;
-uniform float4 U1 < source = ""omega_tri_engine""; index = 1; >;
-uniform float4 U2 < source = ""omega_tri_engine""; index = 2; >;
-uniform float4 U3 < source = ""omega_tri_engine""; index = 3; >;
-uniform float4 U4 < source = ""omega_tri_engine""; index = 4; >;
-uniform float4 U5 < source = ""omega_tri_engine""; index = 5; >;
-uniform float4 U6 < source = ""omega_tri_engine""; index = 6; >;
-uniform float4 U7 < source = ""omega_tri_engine""; index = 7; >;
-uniform float4 U8 < source = ""omega_tri_engine""; index = 8; >;
-uniform float4 U9 < source = ""omega_tri_engine""; index = 9; >;
+texture OmegaHdrHalfTex { Width = BUFFER_WIDTH / 2; Height = BUFFER_HEIGHT / 2; Format = RGBA16F; };
+sampler OmegaHdrHalfSamp { Texture = OmegaHdrHalfTex; };
+
+uniform float4 U0  < source = ""omega_tri_engine""; index = 0;  >;
+uniform float4 U1  < source = ""omega_tri_engine""; index = 1;  >;
+uniform float4 U2  < source = ""omega_tri_engine""; index = 2;  >;
+uniform float4 U3  < source = ""omega_tri_engine""; index = 3;  >;
+uniform float4 U4  < source = ""omega_tri_engine""; index = 4;  >;
+uniform float4 U5  < source = ""omega_tri_engine""; index = 5;  >;
+uniform float4 U6  < source = ""omega_tri_engine""; index = 6;  >;
+uniform float4 U7  < source = ""omega_tri_engine""; index = 7;  >;
+uniform float4 U8  < source = ""omega_tri_engine""; index = 8;  >;
+uniform float4 U9  < source = ""omega_tri_engine""; index = 9;  >;
 uniform float4 U10 < source = ""omega_tri_engine""; index = 10; >;
 uniform float4 U11 < source = ""omega_tri_engine""; index = 11; >;
 uniform float4 U12 < source = ""omega_tri_engine""; index = 12; >;
@@ -2380,17 +2384,44 @@ uniform float4 U16 < source = ""omega_tri_engine""; index = 16; >;
 uniform float4 U17 < source = ""omega_tri_engine""; index = 17; >;
 uniform float4 U18 < source = ""omega_tri_engine""; index = 18; >;
 uniform float4 U19 < source = ""omega_tri_engine""; index = 19; >;
+uniform float4 U20 < source = ""omega_tri_engine""; index = 20; >;
+uniform float4 U21 < source = ""omega_tri_engine""; index = 21; >;
+uniform float4 U22 < source = ""omega_tri_engine""; index = 22; >;
+uniform float4 U23 < source = ""omega_tri_engine""; index = 23; >;
+uniform float4 U24 < source = ""omega_tri_engine""; index = 24; >;
+uniform float4 U25 < source = ""omega_tri_engine""; index = 25; >;
+uniform float4 U26 < source = ""omega_tri_engine""; index = 26; >;
+uniform float4 U27 < source = ""omega_tri_engine""; index = 27; >;
 
 uniform float Timer < source = ""timer""; >;
+uniform float OmegaRsFrameMs < source = ""frametime""; >;
+
+uniform bool UiShowTopDiagBar <
+    ui_label = ""Show 28px Top-Screen Omega Diagnostics HUD Strip (Alt+F2)"";
+> = true;
+
+uniform bool UiAutoMenuFade <
+    ui_label = ""Auto-Fade Shader in Skyrim Menus over 250ms (Alt+F6)"";
+> = true;
+
+uniform bool UiFollowLivePersona <
+    ui_label = ""Follow Live Top-Bar / Bus Aesthetic Persona (U20.x / Alt+F8)"";
+> = true;
+
+uniform int UiAestheticPersona <
+    ui_type = ""combo"";
+    ui_label = ""Aesthetic Shader Persona (0..3)"";
+    ui_items = ""0: Classic Sovngarde\01: Obsidian Dark Fantasy\02: Liminal Dreamcore\03: Stark Nihilist Monolith\0"";
+> = 0;
 
 uniform bool UiUseLiveBusSymmetry <
-    ui_label = ""Follow Live OmegaBus Symmetry (U9.x)"";
+    ui_label = ""Follow Live Station 15 / SKSE64 Symmetry Mode (U9.x / U26.x)"";
 > = true;
 
 uniform int UiSymmetryMode <
     ui_type = ""combo"";
-    ui_items = ""Mode 0 - 5D Penrose P3\0Mode 1 - 8D E8 Coxeter Facets\0Mode 2 - Einstein Hat (1,sqrt3)\0Mode 3 - Chiral Spectre (1,1)\0Mode 4 - 4D Hopf Villarceau (S3 to S2)\0Mode 5 - 4D 24/120-Cell (Hurwitz+H4)\0Mode 6 - Hyperbolic Poincare {5,3,4}\0Mode 7 - 24D Leech + Golay [24,12,8]\0"";
-    ui_label = ""Fallback Quasicrystal Symmetry"";
+    ui_label = ""Fallback Symmetry Mode (0..7)"";
+    ui_items = ""0: 5D Penrose P3\01: 8D E8 Coxeter\02: Einstein Hat (1,sqrt3)\03: Chiral Spectre (1,1)\04: 4D Hopf Villarceau\05: 4D 24/120-Cell H4\06: Hyperbolic Poincare {5,3,4}\07: 24D Leech Golay\0"";
 > = 0;
 
 uniform float UiAuroraBlend <
@@ -2398,7 +2429,7 @@ uniform float UiAuroraBlend <
     ui_min = 0.0;
     ui_max = 1.5;
     ui_step = 0.01;
-    ui_label = ""Sovngarde 5-Fold Quasicrystal Aurora"";
+    ui_label = ""Sovngarde Sky Aurora Intensity"";
 > = 0.78;
 
 uniform float UiCausticStrength <
@@ -2406,15 +2437,31 @@ uniform float UiCausticStrength <
     ui_min = 0.0;
     ui_max = 1.0;
     ui_step = 0.01;
-    ui_label = ""Depth-Normal Aperiodic Caustic Overlay"";
+    ui_label = ""World-Space Ground/Water Caustics"";
 > = 0.36;
+
+uniform float UiHdrBloomStrength <
+    ui_type = ""slider"";
+    ui_min = 0.0;
+    ui_max = 1.5;
+    ui_step = 0.01;
+    ui_label = ""Half-Res RGBA16F Dual-Kawase HDR Bloom"";
+> = 0.34;
+
+uniform float UiGodrayStrength <
+    ui_type = ""slider"";
+    ui_min = 0.0;
+    ui_max = 1.2;
+    ui_step = 0.01;
+    ui_label = ""Depth-Bilateral Crepuscular Godrays"";
+> = 0.28;
 
 uniform float UiSpectralHarmony <
     ui_type = ""slider"";
     ui_min = 0.0;
     ui_max = 1.0;
     ui_step = 0.01;
-    ui_label = ""E8 Root HSV Spectral Dispersion"";
+    ui_label = ""E8 Audio & Spell Chromatic Coupling"";
 > = 0.28;
 
 uniform float UiTileScale <
@@ -2434,7 +2481,7 @@ uniform float UiNormalPlanarWeight <
 > = 0.72;
 
 uniform bool UiWorldSpaceLock <
-    ui_label = ""World-Space Camera Matrix Lock (SKSE64 U1/U18/U19)"";
+    ui_label = ""World-Space Camera & Water Plane Lock (SKSE64 U1/U18/U19/U21)"";
 > = true;
 
 uniform bool UiSheafQuestGuard <
@@ -2659,6 +2706,294 @@ float OmegaPenroseAxisSeam(float2 wp, float ang, float shift)
     return abs(pr - floor(pr + 0.5));
 }
 
+float3 OmegaSpellSchoolPalette(int schoolId)
+{
+    float3 c = float3(0.24, 0.86, 1.0);
+    if (schoolId == 1)      { c = float3(1.00, 0.36, 0.08); } // Destruction Fire
+    else if (schoolId == 2) { c = float3(0.32, 0.88, 1.00); } // Destruction Frost
+    else if (schoolId == 3) { c = float3(0.68, 0.38, 1.00); } // Destruction Shock
+    else if (schoolId == 4) { c = float3(1.00, 0.86, 0.38); } // Restoration Sun
+    else if (schoolId == 5) { c = float3(0.84, 0.20, 0.72); } // Conjuration Void
+    return c;
+}
+
+float3 OmegaApplyPersonaGrade(
+    float3 col,
+    int persona,
+    float2 centeredUv,
+    float depth,
+    float dPattern,
+    float edgeRelief,
+    float vigBase,
+    float masterGain)
+{
+    float rVig = dot(centeredUv, centeredUv);
+    float luma = dot(col, float3(0.2126, 0.7152, 0.0722));
+    float3 graded = col;
+
+    if (persona == 1)
+    {
+        // 1: Obsidian Dark Fantasy - crushed obsidian toe, cold iron midtones, ember-gold & crimson silhouette rims
+        float3 crushed = pow(max(col, float3(0.0001, 0.0001, 0.0001)), float3(1.16, 1.18, 1.12));
+        float3 coldSlate = lerp(float3(luma, luma, luma) * float3(0.84, 0.90, 1.04), crushed, 0.76);
+        float emberRim = saturate(edgeRelief * 3.4) * (1.0 - depth * 0.55);
+        float ironSeam = exp(-dPattern * 18.0) * (1.0 - depth * 0.75) * 0.10;
+        graded = coldSlate + float3(0.92, 0.38, 0.12) * (emberRim * 0.22) + float3(0.82, 0.62, 0.26) * ironSeam;
+        graded = graded * saturate(1.0 - rVig * (0.42 + vigBase));
+    }
+    else if (persona == 2)
+    {
+        // 2: Liminal Dreamcore - pastel lavender/seafoam halation, lifted twilight blacks, valley mist veil
+        float3 softLift = pow(saturate(col * 0.94 + float3(0.028, 0.022, 0.042)), float3(0.92, 0.94, 0.90));
+        float mistFactor = smoothstep(0.18, 0.92, depth) * 0.24;
+        float3 dreamMist = lerp(float3(0.58, 0.52, 0.86), float3(0.38, 0.84, 0.78), saturate(centeredUv.y + 0.5));
+        graded = lerp(softLift, dreamMist, mistFactor);
+        graded = graded * saturate(1.0 - rVig * (0.24 + vigBase * 0.65));
+    }
+    else if (persona == 3)
+    {
+        // 3: Stark Nihilist Monolith - austere silver-bone chiaroscuro + sharp brutalist depth ink & monolith seams
+        float3 mono = float3(luma, luma, luma) * float3(0.95, 0.98, 1.03);
+        float3 stark = lerp(col, mono, 0.78);
+        stark = saturate((stark - float3(0.5, 0.5, 0.5)) * 1.24 + float3(0.5, 0.5, 0.5));
+        float inkEdge = saturate(edgeRelief * 4.5);
+        float boneSeam = exp(-dPattern * 22.0) * (1.0 - depth * 0.80) * 0.14;
+        graded = stark * (1.0 - inkEdge * 0.42) + float3(0.88, 0.92, 0.96) * boneSeam;
+        graded = graded * saturate(1.0 - rVig * (0.46 + vigBase));
+    }
+    else
+    {
+        // 0: Classic Sovngarde - clean natural Skyrim palette with subtle ACES shoulder & gentle rim
+        graded = col * saturate(1.0 - rVig * (0.16 + vigBase * 0.5));
+    }
+
+    return lerp(col, saturate(graded), saturate(masterGain));
+}
+
+// Pass 0 (Half-Resolution RGBA16F): 5-tap Dual-Kawase HDR highlight extraction + sky shaft mask in alpha
+float4 PS_OmegaHdrHalfPrepass(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
+{
+    float2 hpx = float2(BUFFER_RCP_WIDTH * 2.0, BUFFER_RCP_HEIGHT * 2.0);
+    float3 c0 = tex2D(ReShade::BackBuffer, texcoord).rgb;
+    float3 c1 = tex2D(ReShade::BackBuffer, saturate(texcoord + float2( hpx.x,  hpx.y))).rgb;
+    float3 c2 = tex2D(ReShade::BackBuffer, saturate(texcoord + float2(-hpx.x,  hpx.y))).rgb;
+    float3 c3 = tex2D(ReShade::BackBuffer, saturate(texcoord + float2( hpx.x, -hpx.y))).rgb;
+    float3 c4 = tex2D(ReShade::BackBuffer, saturate(texcoord + float2(-hpx.x, -hpx.y))).rgb;
+
+    float3 avg = c0 * 0.50 + (c1 + c2 + c3 + c4) * 0.125;
+    float lum = dot(avg, float3(0.2126, 0.7152, 0.0722));
+    float knee = saturate((lum - 0.58) * 2.15);
+    float3 hdrBright = avg * (knee * knee * 1.45);
+
+    float d = ReShade::GetLinearizedDepth(texcoord);
+    float skyShaft = step(0.985, d) * saturate(lum * 1.25 + 0.12);
+    return float4(hdrBright, skyShaft);
+}
+
+float OmegaRectFill(float2 p, float x0, float y0, float x1, float y1)
+{
+    float ix = step(x0, p.x) * step(p.x, x1);
+    float iy = step(y0, p.y) * step(p.y, y1);
+    return ix * iy;
+}
+
+float OmegaDigit7Seg(float2 lp, int dg)
+{
+    if (lp.x < 0.0 || lp.x > 8.0 || lp.y < 0.0 || lp.y > 12.0)
+    {
+        return 0.0;
+    }
+    float sTop = OmegaRectFill(lp, 1.0, 0.0, 7.0, 1.7);
+    float sMid = OmegaRectFill(lp, 1.0, 5.2, 7.0, 6.8);
+    float sBot = OmegaRectFill(lp, 1.0, 10.3, 7.0, 12.0);
+    float sTL  = OmegaRectFill(lp, 0.0, 1.0, 1.8, 5.8);
+    float sTR  = OmegaRectFill(lp, 6.2, 1.0, 8.0, 5.8);
+    float sBL  = OmegaRectFill(lp, 0.0, 6.2, 1.8, 11.0);
+    float sBR  = OmegaRectFill(lp, 6.2, 6.2, 8.0, 11.0);
+
+    float m = 0.0;
+    if (dg == 0)      { m = max(max(sTop, sBot), max(max(sTL, sTR), max(sBL, sBR))); }
+    else if (dg == 1) { m = max(sTR, sBR); }
+    else if (dg == 2) { m = max(max(sTop, sMid), max(sBot, max(sTR, sBL))); }
+    else if (dg == 3) { m = max(max(sTop, sMid), max(sBot, max(sTR, sBR))); }
+    else if (dg == 4) { m = max(sMid, max(sTL, max(sTR, sBR))); }
+    else if (dg == 5) { m = max(max(sTop, sMid), max(sBot, max(sTL, sBR))); }
+    else if (dg == 6) { m = max(max(sTop, sMid), max(sBot, max(sTL, max(sBL, sBR)))); }
+    else if (dg == 7) { m = max(sTop, max(sTR, sBR)); }
+    else if (dg == 8) { m = max(max(sTop, sMid), max(sBot, max(max(sTL, sTR), max(sBL, sBR)))); }
+    else              { m = max(max(sTop, sMid), max(sBot, max(sTL, max(sTR, sBR)))); }
+    return saturate(m);
+}
+
+float3 OmegaRenderTopDiagStrip(
+    float2 px,
+    float3 sceneCol,
+    bool masterOn,
+    bool skLive,
+    bool rsLive,
+    int activeSym,
+    int activePersona,
+    float aurLevel,
+    float cauLevel,
+    float menuFadeAlpha,
+    float thuumLevel,
+    float h1Val,
+    float fpsVal)
+{
+    float3 bg = lerp(sceneCol * 0.20, float3(0.043, 0.055, 0.078), 0.88);
+    if (px.y >= 26.5)
+    {
+        float gx = saturate(px.x * BUFFER_RCP_WIDTH);
+        return lerp(float3(0.96, 0.72, 0.32), float3(0.36, 0.88, 0.90), gx);
+    }
+
+    float3 hud = bg;
+    float3 cGold  = float3(0.96, 0.72, 0.32);
+    float3 cCyan  = float3(0.36, 0.88, 0.90);
+    float3 cGreen = float3(0.20, 0.84, 0.60);
+    float3 cSlate = float3(0.20, 0.26, 0.34);
+    float3 cCoral = float3(0.96, 0.38, 0.38);
+
+    float2 dEmb = abs(px - float2(18.0, 13.5));
+    float octD = max(max(dEmb.x, dEmb.y), (dEmb.x + dEmb.y) * 0.7071);
+    if (octD >= 4.2 && octD <= 6.8)
+    {
+        hud = cGold;
+    }
+    float d1 = OmegaDigit7Seg(px - float2(30.0, 7.5), 1);
+    float dotV = OmegaRectFill(px, 40.0, 17.5, 42.0, 19.5);
+    float d9 = OmegaDigit7Seg(px - float2(44.5, 7.5), 9);
+    hud = lerp(hud, cGold, saturate(max(d1, max(dotV, d9))));
+
+    float fxPill = OmegaRectFill(px, 62.0, 6.5, 94.0, 20.5);
+    if (fxPill > 0.5)
+    {
+        float3 fxCol = cCoral;
+        if (masterOn) { fxCol = cGreen; }
+        hud = lerp(hud, fxCol * 0.32, 0.85);
+        float fxDot = step(length(px - float2(71.0, 13.5)), 3.2);
+        float fxBar = OmegaRectFill(px, 78.0, 11.5, 89.0, 15.5);
+        hud = lerp(hud, fxCol, saturate(max(fxDot, fxBar)));
+    }
+
+    float skPill = OmegaRectFill(px, 102.0, 6.5, 133.0, 20.5);
+    if (skPill > 0.5)
+    {
+        float3 skCol = cSlate;
+        if (skLive) { skCol = cGreen; }
+        hud = lerp(hud, skCol * 0.28, 0.85);
+        float skLed = step(length(px - float2(111.0, 13.5)), 3.4);
+        float skTick = OmegaRectFill(px, 118.0, 12.0, 128.0, 15.0);
+        hud = lerp(hud, skCol, saturate(max(skLed, skTick)));
+    }
+
+    float rsPill = OmegaRectFill(px, 139.0, 6.5, 170.0, 20.5);
+    if (rsPill > 0.5)
+    {
+        float3 rsCol = cSlate;
+        if (rsLive) { rsCol = cCyan; }
+        hud = lerp(hud, rsCol * 0.28, 0.85);
+        float rsLed = step(length(px - float2(148.0, 13.5)), 3.4);
+        float rsTick = OmegaRectFill(px, 155.0, 12.0, 165.0, 15.0);
+        hud = lerp(hud, rsCol, saturate(max(rsLed, rsTick)));
+    }
+
+    if (px.x >= 182.0 && px.x < 310.0 && px.y >= 7.5 && px.y <= 19.5)
+    {
+        float relX = px.x - 182.0;
+        int cellIdx = (int)floor(relX / 16.0);
+        float cellLocalX = relX - floor(relX / 16.0) * 16.0;
+        if (cellLocalX <= 13.0)
+        {
+            hud = cSlate * 0.65;
+            if (cellIdx == activeSym)
+            {
+                hud = cGold;
+            }
+        }
+    }
+    float symDg = OmegaDigit7Seg(px - float2(314.0, 7.5), activeSym);
+    hud = lerp(hud, cCyan, symDg);
+
+    if (OmegaRectFill(px, 334.0, 9.0, 404.0, 18.0) > 0.5)
+    {
+        hud = cSlate * 0.55;
+        if ((px.x - 334.0) <= saturate(aurLevel) * 70.0) { hud = float3(0.18, 0.84, 0.75); }
+    }
+    if (OmegaRectFill(px, 414.0, 9.0, 484.0, 18.0) > 0.5)
+    {
+        hud = cSlate * 0.55;
+        if ((px.x - 414.0) <= saturate(cauLevel) * 70.0) { hud = float3(0.38, 0.65, 0.98); }
+    }
+    if (OmegaRectFill(px, 494.0, 9.0, 564.0, 18.0) > 0.5)
+    {
+        hud = cSlate * 0.55;
+        if ((px.x - 494.0) <= saturate(menuFadeAlpha) * 70.0) { hud = cGold; }
+    }
+    if (OmegaRectFill(px, 574.0, 9.0, 644.0, 18.0) > 0.5)
+    {
+        hud = cSlate * 0.55;
+        if ((px.x - 574.0) <= saturate(thuumLevel) * 70.0) { hud = float3(0.75, 0.52, 0.98); }
+    }
+
+    if (OmegaRectFill(px, 656.0, 6.5, 686.0, 20.5) > 0.5)
+    {
+        float3 hCol = cGreen;
+        if (h1Val >= 1.5) { hCol = cGold; }
+        else if (h1Val < -0.5) { hCol = cCoral; }
+        hud = lerp(hud, hCol * 0.30, 0.85);
+        float hDot = step(length(px - float2(671.0, 13.5)), 4.0);
+        hud = lerp(hud, hCol, hDot);
+    }
+
+    // Persona 0..3 4-pip indicator + 7-seg digit (694..754 px)
+    if (px.x >= 694.0 && px.x < 742.0 && px.y >= 7.5 && px.y <= 19.5)
+    {
+        float pRel = px.x - 694.0;
+        int pIdx = (int)floor(pRel / 12.0);
+        float pLoc = pRel - floor(pRel / 12.0) * 12.0;
+        if (pLoc <= 9.5)
+        {
+            hud = cSlate * 0.65;
+            if (pIdx == activePersona)
+            {
+                float3 perCol = cGold;
+                if (activePersona == 1)      { perCol = float3(0.92, 0.22, 0.34); }
+                else if (activePersona == 2) { perCol = float3(0.76, 0.54, 0.98); }
+                else if (activePersona == 3) { perCol = float3(0.84, 0.88, 0.94); }
+                hud = perCol;
+            }
+        }
+    }
+    float perDg = OmegaDigit7Seg(px - float2(745.0, 7.5), activePersona);
+    hud = lerp(hud, cGold, perDg);
+
+    float fpsClamped = clamp(floor(fpsVal + 0.5), 0.0, 999.0);
+    int dHund = (int)floor(fpsClamped / 100.0);
+    float rem100 = fpsClamped - (float)(dHund * 100);
+    int dTens = (int)floor(rem100 / 10.0);
+    int dOnes = (int)floor(rem100 - (float)(dTens * 10) + 0.1);
+
+    float xRight = BUFFER_WIDTH - 46.0;
+    float mFps = 0.0;
+    if (dHund > 0)
+    {
+        mFps = max(mFps, OmegaDigit7Seg(px - float2(xRight, 7.5), dHund));
+    }
+    if (dHund > 0 || dTens > 0)
+    {
+        mFps = max(mFps, OmegaDigit7Seg(px - float2(xRight + 11.0, 7.5), dTens));
+    }
+    mFps = max(mFps, OmegaDigit7Seg(px - float2(xRight + 22.0, 7.5), dOnes));
+
+    float3 fpsCol = cCyan;
+    if (fpsVal < 30.0) { fpsCol = cCoral; }
+    else if (fpsVal < 54.0) { fpsCol = cGold; }
+    hud = lerp(hud, fpsCol, saturate(mFps));
+
+    return saturate(hud);
+}
+
 float4 PS_OmegaTriEngine(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
 {
     float liveMaskF = floor(max(0.0, U11.w) + 0.5);
@@ -2666,19 +3001,81 @@ float4 PS_OmegaTriEngine(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) 
     float bit5Check = frac(floor(liveMaskF / 32.0) * 0.5);
     bool skseWorldLive = (bit5Check > 0.25);
 
+    bool v2Active = (abs(U27.x - 180.0) < 0.5);
+    if (v2Active && U27.w > 0.5)
+    {
+        skseWorldLive = true;
+    }
+    bool rsAddonLive = busLive;
+    if (v2Active && U27.z > 0.5)
+    {
+        rsAddonLive = true;
+    }
+
+    bool topStripAllowed = UiShowTopDiagBar;
+    if (v2Active && U24.x < 0.5)
+    {
+        topStripAllowed = false;
+    }
+
+    bool shaderMasterOn = true;
+    if (v2Active && U24.y < 0.5)
+    {
+        shaderMasterOn = false;
+    }
+
+    float menuFadeAlpha = 1.0;
+    if (v2Active && UiAutoMenuFade && U24.z > 0.5)
+    {
+        menuFadeAlpha = clamp(U25.z, 0.06, 1.0);
+    }
+
+    float aurMult = 1.0;
+    float cauMult = 1.0;
+    float hdrBusMult = 1.0;
+    float personaVig = 0.18;
+    int activePersona = UiAestheticPersona;
+    float waterPlaneY = -0.14;
+    float waterRippleGain = 1.0;
+    int spellSchoolId = 0;
+    float spellIntensity = 0.0;
+
+    if (v2Active)
+    {
+        if (U26.y > 0.05) { aurMult = clamp(U26.y, 0.1, 3.0); }
+        if (U26.z > 0.05) { cauMult = clamp(U26.z, 0.1, 3.0); }
+        if (UiFollowLivePersona)
+        {
+            activePersona = (int)clamp(floor(U20.x + 0.5), 0.0, 3.0);
+        }
+        if (U20.z >= 0.01) { personaVig = clamp(U20.z, 0.0, 0.65); }
+        if (U20.w > 0.05)  { hdrBusMult = clamp(U20.w, 0.1, 3.0); }
+        waterPlaneY = clamp(U21.x, -500.0, 500.0);
+        if (U21.y > 0.05)  { waterRippleGain = clamp(U21.y, 0.1, 3.0); }
+        spellSchoolId = (int)clamp(floor(U21.z + 0.5), 0.0, 5.0);
+        spellIntensity = clamp(U21.w, 0.0, 2.5);
+    }
+
+    float masterGain = menuFadeAlpha;
+    if (!shaderMasterOn)
+    {
+        masterGain = 0.0;
+    }
+
     float tSec = Timer * 0.001;
     if (busLive)
     {
         tSec = U0.z;
     }
 
-    float depth = ReShade::GetLinearizedDepth(texcoord);
-    float3 vNorm = OmegaEstimateViewNormal(texcoord, depth);
-
     int activeSym = UiSymmetryMode;
     if (busLive && UiUseLiveBusSymmetry)
     {
         activeSym = (int)clamp(floor(U9.x + 0.5), 0.0, 7.0);
+    }
+    if (v2Active && UiUseLiveBusSymmetry && U26.x >= -0.25)
+    {
+        activeSym = (int)clamp(floor(U26.x + 0.5), 0.0, 7.0);
     }
     if (UiSheafQuestGuard && skseWorldLive)
     {
@@ -2691,6 +3088,12 @@ float4 PS_OmegaTriEngine(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) 
             activeSym = 0;
         }
     }
+
+    float depth = ReShade::GetLinearizedDepth(texcoord);
+    float dRight = ReShade::GetLinearizedDepth(texcoord + float2(BUFFER_RCP_WIDTH * 1.5, 0.0));
+    float dDown  = ReShade::GetLinearizedDepth(texcoord + float2(0.0, BUFFER_RCP_HEIGHT * 1.5));
+    float edgeRelief = abs(depth - dRight) + abs(depth - dDown);
+    float3 vNorm = OmegaEstimateViewNormal(texcoord, depth);
 
     float tileScale = UiTileScale;
     if (busLive && U9.y > 0.05)
@@ -2711,7 +3114,7 @@ float4 PS_OmegaTriEngine(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) 
         rShout = length(worldXYZ - U13.xyz);
         shoutFalloff = 0.55;
     }
-    float impWave = exp(-abs(rShout - U14.y) * shoutFalloff) * U14.x;
+    float impWave = exp(-abs(rShout - U14.y) * shoutFalloff) * U14.x * masterGain;
     float2 dirUv = normalize(centered + float2(0.00001, 0.00001));
     float2 warpedUv = saturate(texcoord + dirUv * (impWave * 0.013 * cos(rShout * 3.2 - tSec * max(6.0, U14.z))));
 
@@ -2722,123 +3125,237 @@ float4 PS_OmegaTriEngine(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) 
         weatherAuroraGain = U14.w;
     }
 
-    if (depth >= 0.992 && UiAuroraBlend > 0.001)
-    {
-        float2 skyP = centered * (2.7 * tileScale);
-        if (skseWorldLive && UiWorldSpaceLock)
-        {
-            skyP = (rayWorldDir.xz / max(0.18, abs(rayWorldDir.y) + 0.22)) * (1.85 * tileScale);
-        }
-        float a0 = tSec * 0.04;
-        float a1 = 1.25663706 + tSec * 0.04;
-        float a2 = 2.51327412 + tSec * 0.04;
-        float a3 = 3.76991118 + tSec * 0.04;
-        float a4 = 5.02654824 + tSec * 0.04;
-        float qSum = cos(dot(skyP, float2(cos(a0), sin(a0))) + U7.x + tSec * 0.42)
-                   + cos(dot(skyP, float2(cos(a1), sin(a1))) + U7.y + tSec * 0.42)
-                   + cos(dot(skyP, float2(cos(a2), sin(a2))) + U7.z + tSec * 0.42)
-                   + cos(dot(skyP, float2(cos(a3), sin(a3))) + U7.w + tSec * 0.42)
-                   + cos(dot(skyP, float2(cos(a4), sin(a4))) + U8.x + tSec * 0.42);
+    float dPatternForGrade = 0.5;
+    float3 spellCol = OmegaSpellSchoolPalette(spellSchoolId);
 
-        float curtain = exp(-abs(qSum) * 0.92) * saturate(1.0 - texcoord.y * 1.32);
-        float audioBoost = 0.65 + 0.85 * U3.x + 0.35 * U12.x;
-        float sovngardeGold = saturate((weatherAuroraGain - 1.10) * 2.2);
-        float3 aurBase = lerp(float3(0.06, 0.90, 0.70), float3(0.58, 0.24, 0.98), saturate(0.5 + 0.5 * sin(qSum + tSec * 0.38)));
-        float3 aur = lerp(aurBase, float3(0.98, 0.84, 0.32), sovngardeGold * 0.45);
-        col = col + aur * (curtain * UiAuroraBlend * weatherAuroraGain * audioBoost * 0.56);
-    }
-    else if (UiCausticStrength > 0.001)
+    if (masterGain > 0.001)
     {
-        float planarMask = lerp(1.0, saturate(abs(vNorm.y) * 1.35 + 0.15), UiNormalPlanarWeight);
-        float2 wp = centered * (depth * 24.0 * tileScale) + float2(U8.y, U8.z) * 1.5;
-        if (skseWorldLive && UiWorldSpaceLock)
+        if (depth >= 0.992 && UiAuroraBlend > 0.001)
         {
-            wp = worldXYZ.xz * (0.42 * tileScale) + float2(U8.y, U8.z) * 1.5;
-        }
-
-        float dPattern = 0.5;
-        if (activeSym == 7)
-        {
-            dPattern = OmegaLeech24GolaySeam(wp, tSec);
-        }
-        else if (activeSym == 6)
-        {
-            dPattern = OmegaPoincare534Seam(wp, tSec);
-        }
-        else if (activeSym == 5)
-        {
-            dPattern = OmegaPolychoraH4Seam(wp, tSec);
-        }
-        else if (activeSym == 4)
-        {
-            dPattern = OmegaHopfVillarceauSeam(wp, tSec);
-        }
-        else if (activeSym == 3)
-        {
-            float2 curl = wp + 0.16 * float2(sin(wp.y * 2.094 + tSec * 0.55), -sin(wp.x * 2.094 - tSec * 0.55));
-            dPattern = OmegaTriSeam(curl);
-        }
-        else if (activeSym == 2)
-        {
-            dPattern = min(OmegaTriSeam(wp), OmegaTriSeam(wp * 0.381966 + float2(0.37, -0.22)) * 1.35);
-        }
-        else if (activeSym == 1)
-        {
-            dPattern = OmegaE8FacetSeam(wp, tSec);
-        }
-        else
-        {
-            float sh0 = tSec * 0.16;
-            float sh1 = tSec * 0.16;
-            float sh2 = tSec * 0.16;
-            float sh3 = tSec * 0.16;
-            float sh4 = tSec * 0.16;
-            if ((abs(U7.x) + abs(U7.y) + abs(U7.z)) > 0.0005)
+            float2 skyP = centered * (2.7 * tileScale);
+            if (skseWorldLive && UiWorldSpaceLock)
             {
-                sh0 = U7.x;
-                sh1 = U7.y;
-                sh2 = U7.z;
-                sh3 = U7.w;
-                sh4 = U8.x;
+                skyP = (rayWorldDir.xz / max(0.18, abs(rayWorldDir.y) + 0.22)) * (1.85 * tileScale);
             }
-            float m5 = OmegaPenroseAxisSeam(wp, 0.0, sh0);
-            m5 = min(m5, OmegaPenroseAxisSeam(wp, 1.25663706, sh1));
-            m5 = min(m5, OmegaPenroseAxisSeam(wp, 2.51327412, sh2));
-            m5 = min(m5, OmegaPenroseAxisSeam(wp, 3.76991118, sh3));
-            m5 = min(m5, OmegaPenroseAxisSeam(wp, 5.02654824, sh4));
-            dPattern = m5;
+            float a0 = tSec * 0.04;
+            float a1 = 1.25663706 + tSec * 0.04;
+            float a2 = 2.51327412 + tSec * 0.04;
+            float a3 = 3.76991118 + tSec * 0.04;
+            float a4 = 5.02654824 + tSec * 0.04;
+            float qSum = cos(dot(skyP, float2(cos(a0), sin(a0))) + U7.x + tSec * 0.42)
+                       + cos(dot(skyP, float2(cos(a1), sin(a1))) + U7.y + tSec * 0.42)
+                       + cos(dot(skyP, float2(cos(a2), sin(a2))) + U7.z + tSec * 0.42)
+                       + cos(dot(skyP, float2(cos(a3), sin(a3))) + U7.w + tSec * 0.42)
+                       + cos(dot(skyP, float2(cos(a4), sin(a4))) + U8.x + tSec * 0.42);
+
+            float curtain = exp(-abs(qSum) * 0.92) * saturate(1.0 - texcoord.y * 1.32);
+            float audioBoost = 0.65 + 0.85 * U3.x + 0.35 * U12.x;
+            float sovngardeGold = saturate((weatherAuroraGain - 1.10) * 2.2);
+            float3 aurBase = lerp(float3(0.06, 0.90, 0.70), float3(0.58, 0.24, 0.98), saturate(0.5 + 0.5 * sin(qSum + tSec * 0.38)));
+            if (activePersona == 1)
+            {
+                aurBase = lerp(float3(0.72, 0.16, 0.22), float3(0.92, 0.64, 0.24), saturate(0.5 + 0.5 * sin(qSum * 0.8)));
+            }
+            else if (activePersona == 2)
+            {
+                aurBase = lerp(float3(0.52, 0.86, 0.92), float3(0.86, 0.58, 0.98), saturate(0.5 + 0.5 * cos(qSum * 0.7 + tSec * 0.25)));
+            }
+            else if (activePersona == 3)
+            {
+                aurBase = float3(0.78, 0.84, 0.92);
+            }
+            float3 aur = lerp(aurBase, float3(0.98, 0.84, 0.32), sovngardeGold * 0.45);
+            if (spellSchoolId > 0 && spellIntensity > 0.02)
+            {
+                aur = lerp(aur, spellCol, saturate(spellIntensity * 0.38));
+            }
+            col = col + aur * (curtain * UiAuroraBlend * aurMult * weatherAuroraGain * audioBoost * 0.56 * masterGain);
+        }
+        else if (UiCausticStrength > 0.001)
+        {
+            float planarMask = lerp(1.0, saturate(abs(vNorm.y) * 1.35 + 0.15), UiNormalPlanarWeight);
+            float2 wp = centered * (depth * 24.0 * tileScale) + float2(U8.y, U8.z) * 1.5;
+            float waterBandBoost = 1.0;
+            if (skseWorldLive && UiWorldSpaceLock)
+            {
+                wp = worldXYZ.xz * (0.42 * tileScale) + float2(U8.y, U8.z) * 1.5;
+                float distWater = abs(worldXYZ.y - waterPlaneY);
+                float shorelineMask = exp(-distWater * 1.35) * saturate(abs(vNorm.y) * 1.4);
+                waterBandBoost = 1.0 + shorelineMask * (0.85 * waterRippleGain);
+                wp = wp + float2(sin(tSec * 1.35 + worldXYZ.z * 1.8), cos(tSec * 1.15 + worldXYZ.x * 1.8)) * (shorelineMask * 0.09);
+            }
+
+            float dPattern = 0.5;
+            if (activeSym == 7)
+            {
+                dPattern = OmegaLeech24GolaySeam(wp, tSec);
+            }
+            else if (activeSym == 6)
+            {
+                dPattern = OmegaPoincare534Seam(wp, tSec);
+            }
+            else if (activeSym == 5)
+            {
+                dPattern = OmegaPolychoraH4Seam(wp, tSec);
+            }
+            else if (activeSym == 4)
+            {
+                dPattern = OmegaHopfVillarceauSeam(wp, tSec);
+            }
+            else if (activeSym == 3)
+            {
+                float2 curl = wp + 0.16 * float2(sin(wp.y * 2.094 + tSec * 0.55), -sin(wp.x * 2.094 - tSec * 0.55));
+                dPattern = OmegaTriSeam(curl);
+            }
+            else if (activeSym == 2)
+            {
+                dPattern = min(OmegaTriSeam(wp), OmegaTriSeam(wp * 0.381966 + float2(0.37, -0.22)) * 1.35);
+            }
+            else if (activeSym == 1)
+            {
+                dPattern = OmegaE8FacetSeam(wp, tSec);
+            }
+            else
+            {
+                float sh0 = tSec * 0.16;
+                float sh1 = tSec * 0.16;
+                float sh2 = tSec * 0.16;
+                float sh3 = tSec * 0.16;
+                float sh4 = tSec * 0.16;
+                if ((abs(U7.x) + abs(U7.y) + abs(U7.z)) > 0.0005)
+                {
+                    sh0 = U7.x;
+                    sh1 = U7.y;
+                    sh2 = U7.z;
+                    sh3 = U7.w;
+                    sh4 = U8.x;
+                }
+                float m5 = OmegaPenroseAxisSeam(wp, 0.0, sh0);
+                m5 = min(m5, OmegaPenroseAxisSeam(wp, 1.25663706, sh1));
+                m5 = min(m5, OmegaPenroseAxisSeam(wp, 2.51327412, sh2));
+                m5 = min(m5, OmegaPenroseAxisSeam(wp, 3.76991118, sh3));
+                m5 = min(m5, OmegaPenroseAxisSeam(wp, 5.02654824, sh4));
+                dPattern = m5;
+            }
+            dPatternForGrade = dPattern;
+
+            float audioMid = 0.55 + 0.75 * U3.y + 0.30 * U3.w;
+            float caus = exp(-dPattern * 14.5) * (1.0 - depth * 0.88) * planarMask * UiCausticStrength * cauMult * waterBandBoost * audioMid * masterGain;
+            float3 baseTint = float3(0.10, 0.80, 0.96);
+            if (activeSym == 1)
+            {
+                baseTint = float3(0.45, 0.62, 1.0);
+            }
+            else if (activeSym == 3)
+            {
+                baseTint = float3(0.96, 0.76, 0.24);
+            }
+            float specHue = frac(U12.w / 240.0 + tSec * 0.05 + U3.x * 0.18);
+            float3 tint = lerp(baseTint, OmegaHsv2Rgb(float3(specHue, 0.75, 1.0)), saturate(UiSpectralHarmony));
+            if (spellSchoolId > 0 && spellIntensity > 0.02)
+            {
+                tint = lerp(tint, spellCol, saturate(spellIntensity * 0.65));
+            }
+            float thuumCausticBoost = 1.0 + impWave * 1.45 + spellIntensity * 0.35;
+            col = col + tint * (caus * thuumCausticBoost * 0.44);
+            if (UiSheafQuestGuard && skseWorldLive && U16.w < -0.5)
+            {
+                col = col + float3(0.96, 0.52, 0.12) * (exp(-dPattern * 20.0) * 0.22 * masterGain);
+            }
         }
 
-        float audioMid = 0.55 + 0.75 * U3.y + 0.30 * U3.w;
-        float caus = exp(-dPattern * 14.5) * (1.0 - depth * 0.88) * planarMask * UiCausticStrength * audioMid;
-        float3 baseTint = float3(0.10, 0.80, 0.96);
-        if (activeSym == 1)
+        // Half-Res RGBA16F Dual-Kawase HDR BloomUpsample + Depth-Bilateral Crepuscular Godrays
+        if (UiHdrBloomStrength > 0.001 || UiGodrayStrength > 0.001)
         {
-            baseTint = float3(0.45, 0.62, 1.0);
+            float2 upPx = float2(BUFFER_RCP_WIDTH * 1.5, BUFFER_RCP_HEIGHT * 1.5);
+            float4 b0 = tex2D(OmegaHdrHalfSamp, saturate(warpedUv + float2( upPx.x,  upPx.y)));
+            float4 b1 = tex2D(OmegaHdrHalfSamp, saturate(warpedUv + float2(-upPx.x,  upPx.y)));
+            float4 b2 = tex2D(OmegaHdrHalfSamp, saturate(warpedUv + float2( upPx.x, -upPx.y)));
+            float4 b3 = tex2D(OmegaHdrHalfSamp, saturate(warpedUv + float2(-upPx.x, -upPx.y)));
+            float4 bloomTap = (b0 + b1 + b2 + b3) * 0.25;
+
+            float personaBloomScale = 1.0;
+            if (activePersona == 2)      { personaBloomScale = 1.38; }
+            else if (activePersona == 3) { personaBloomScale = 0.55; }
+            col = col + bloomTap.rgb * (UiHdrBloomStrength * hdrBusMult * personaBloomScale * 0.52 * masterGain);
+
+            if (UiGodrayStrength > 0.001)
+            {
+                float2 sunAnchor = float2(0.5 + clamp(U17.x * 0.28, -0.35, 0.35), 0.16);
+                float2 rayStep = (sunAnchor - texcoord) * 0.055;
+                float shaftAcc = bloomTap.a * 0.30;
+                float4 r1 = tex2D(OmegaHdrHalfSamp, saturate(texcoord + rayStep * 1.0));
+                float4 r2 = tex2D(OmegaHdrHalfSamp, saturate(texcoord + rayStep * 2.0));
+                float4 r3 = tex2D(OmegaHdrHalfSamp, saturate(texcoord + rayStep * 3.0));
+                float4 r4 = tex2D(OmegaHdrHalfSamp, saturate(texcoord + rayStep * 4.0));
+                shaftAcc = shaftAcc + (r1.a * 0.26 + r2.a * 0.20 + r3.a * 0.14 + r4.a * 0.10);
+                float bilateralGate = 1.0 - saturate(edgeRelief * 6.0) * 0.45;
+                float3 shaftCol = float3(0.96, 0.86, 0.62);
+                if (activePersona == 1)      { shaftCol = float3(0.92, 0.52, 0.24); }
+                else if (activePersona == 2) { shaftCol = float3(0.74, 0.68, 0.98); }
+                else if (activePersona == 3) { shaftCol = float3(0.82, 0.86, 0.92); }
+                if (spellSchoolId > 0 && spellIntensity > 0.05)
+                {
+                    shaftCol = lerp(shaftCol, spellCol, saturate(spellIntensity * 0.45));
+                }
+                col = col + shaftCol * (shaftAcc * bilateralGate * UiGodrayStrength * hdrBusMult * 0.26 * masterGain);
+            }
         }
-        else if (activeSym == 3)
+
+        float3 pulseTint = float3(0.24, 0.86, 1.0);
+        if (spellSchoolId > 0 && spellIntensity > 0.02)
         {
-            baseTint = float3(0.96, 0.76, 0.24);
+            pulseTint = lerp(pulseTint, spellCol, saturate(spellIntensity * 0.80));
         }
-        float specHue = frac(U12.w / 240.0 + tSec * 0.05 + U3.x * 0.18);
-        float3 tint = lerp(baseTint, OmegaHsv2Rgb(float3(specHue, 0.75, 1.0)), saturate(UiSpectralHarmony));
-        float thuumCausticBoost = 1.0 + impWave * 1.45;
-        col = col + tint * (caus * thuumCausticBoost * 0.44);
-        if (UiSheafQuestGuard && skseWorldLive && U16.w < -0.5)
-        {
-            col = col + float3(0.96, 0.52, 0.12) * (exp(-dPattern * 20.0) * 0.22);
-        }
+        col = col + pulseTint * (impWave * 0.65);
+
+        col = OmegaApplyPersonaGrade(col, activePersona, centered, depth, dPatternForGrade, edgeRelief, personaVig, masterGain);
     }
 
-    col = col + float3(0.24, 0.86, 1.0) * (impWave * 0.65);
+    if (topStripAllowed && vpos.y < 28.0)
+    {
+        float liveFps = 60.0;
+        if (OmegaRsFrameMs > 0.20)
+        {
+            liveFps = 1000.0 / OmegaRsFrameMs;
+        }
+        if (v2Active && U25.x > 1.0)
+        {
+            liveFps = U25.x;
+        }
+        float aurLvl = saturate(UiAuroraBlend * aurMult * weatherAuroraGain * 0.55);
+        float cauLvl = saturate(UiCausticStrength * cauMult * 1.6);
+        float thmLvl = saturate(U14.x * 0.75 + U3.x * 0.45 + spellIntensity * 0.40);
+        col = OmegaRenderTopDiagStrip(
+            vpos.xy,
+            col,
+            shaderMasterOn,
+            skseWorldLive,
+            rsAddonLive,
+            activeSym,
+            activePersona,
+            aurLvl,
+            cauLvl,
+            menuFadeAlpha,
+            thmLvl,
+            U16.w,
+            liveFps);
+    }
+
     return float4(saturate(col), 1.0);
 }
 
 technique OmegaTriEngine <
-    ui_tooltip = ""Omega Tri-Engine v1.7.7 (SKSE64 World-Space Camera + Sovngarde Aurora + Thuum Caustics + H1=0 Spectre Guard)"";
+    ui_tooltip = ""Omega Tri-Engine v1.9.0 (Phase 2: 28px Top Bar + 4 Dark-Fantasy/Dreamcore/Nihilist Personas + Half-Res RGBA16F HDR Bloom/Godrays + Water/Spell Coupling)"";
 >
 {
-    pass P0
+    pass P0_HalfHdr
+    {
+        VertexShader = PostProcessVS;
+        PixelShader  = PS_OmegaHdrHalfPrepass;
+        RenderTarget = OmegaHdrHalfTex;
+    }
+    pass P1_Composite
     {
         VertexShader = PostProcessVS;
         PixelShader  = PS_OmegaTriEngine;
@@ -2876,6 +3393,12 @@ technique OmegaTriEngine <
                 "TechniqueSorting=OmegaTriEngine@OmegaTriEngine_SkyrimAE.fx\r\n" +
                 "PreprocessorDefinitions=" + skyrimDepthDefs + "\r\n\r\n" +
                 "[OmegaTriEngine_SkyrimAE.fx]\r\n" +
+                "UiShowTopDiagBar=1\r\n" +
+                "UiAutoMenuFade=1\r\n" +
+                "UiFollowLivePersona=1\r\n" +
+                "UiAestheticPersona=0\r\n" +
+                "UiHdrBloomStrength=0.340000\r\n" +
+                "UiGodrayStrength=0.280000\r\n" +
                 "UiUseLiveBusSymmetry=1\r\n" +
                 string.Format(CultureInfo.InvariantCulture, "UiSymmetryMode={0}\r\n", symMode) +
                 string.Format(CultureInfo.InvariantCulture, "UiAuroraBlend={0:0.000000}\r\n", defAurora) +

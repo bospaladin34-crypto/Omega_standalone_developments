@@ -433,7 +433,12 @@ namespace OmegaTensorStudio
             {
                 if (!TcpProbeFast(sshLocalPort, 160)) return;
                 string sshExe = @"C:\Windows\System32\OpenSSH\ssh.exe";
-                string srcPriv = Path.Combine(_suiteRoot, "10_omega_shell", "config", "ssh", "id_ed25519_omega");
+                string localSshDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OmegaAvfSsh");
+                string srcPriv = Path.Combine(localSshDir, "id_ed25519_omega");
+                if (!File.Exists(srcPriv))
+                {
+                    srcPriv = Path.Combine(_suiteRoot, "10_omega_shell", "config", "ssh", "id_ed25519_omega");
+                }
                 if (!File.Exists(sshExe) || !File.Exists(srcPriv)) return;
 
                 string safeDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OmegaAvfSsh");

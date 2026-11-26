@@ -193,7 +193,9 @@ namespace OmegaShellStudio
 
         public static string GetSshKeyDirectory(string shellRoot)
         {
-            string dir = Path.Combine(shellRoot, "config", "ssh");
+            string baseLocal = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (string.IsNullOrEmpty(baseLocal)) baseLocal = Path.GetTempPath();
+            string dir = Path.Combine(baseLocal, "OmegaAvfSsh");
             Directory.CreateDirectory(dir);
             return dir;
         }

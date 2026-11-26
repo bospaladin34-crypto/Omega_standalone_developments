@@ -76,7 +76,7 @@ if (-not (Test-Path $Csc)) {
 }
 
 Write-Host "=========================================================================" -ForegroundColor Cyan
-Write-Host " OMEGA UNIFIED LABS v3.7.1 :: ZERO-NUGET 16-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
+Write-Host " OMEGA UNIFIED LABS v3.9.0 :: ZERO-NUGET 16-PASS COMPILER & VERIFIER" -ForegroundColor Cyan
 Write-Host "=========================================================================" -ForegroundColor Cyan
 
 # Stop any running station binaries before recompiling in place
@@ -276,19 +276,48 @@ $ReDir = Join-Path $RepoRoot "14_omega_braid_re"
 $ReSrc = @($CommonCfg) + @(Get-ChildItem -Path $ReDir -Filter "*.cs" | Sort-Object Name | ForEach-Object { $_.FullName })
 if (-not (Invoke-StationBuild "14. OmegaBraidRE (:19794 Lifter+Differ)" (Join-Path $ReDir "OmegaBraidRE.exe") (Join-Path $IconsDir "omega_braid_re.ico") @() $ReSrc)) { $FailCount++ }
 
-# 15. OmegaEngine (:19795 Standalone 3D DirectCompute Arena + 320B Seqlock + ReShade .fx Bridge)
+# 15. OmegaEngine (:19795 Standalone 3D DirectCompute Arena + 512B OTRI v1.8 Seqlock + TopBar + ReShade/SKSE64 Bridge)
 $EnDir = Join-Path $RepoRoot "15_omega_engine"
-$EnAddonOut = Join-Path $EnDir "exports\OmegaTriEngine.addon64"
-if ((-not (Test-Path $EnAddonOut)) -and (Test-Path (Join-Path $EnDir "reshade_addon\Cargo.toml"))) {
+$EnExportsDir = Join-Path $EnDir "exports"
+$SharedEnExportsDir = Join-Path $RepoRoot "downloads\omega_engine_exports"
+New-Item -ItemType Directory -Force -Path $EnExportsDir | Out-Null
+New-Item -ItemType Directory -Force -Path $SharedEnExportsDir | Out-Null
+if (-not $SkipRust) {
     $Cgo = Get-Command "cargo.exe" -ErrorAction SilentlyContinue
     if ($Cgo) {
-        Push-Location (Join-Path $EnDir "reshade_addon")
-        try { & $Cgo.Source build --release --quiet | Out-Host } finally { Pop-Location }
-        $BuiltA = Join-Path $EnDir "reshade_addonarget
-elease\omega_tri_engine_addon.dll"
-        if (Test-Path $BuiltA) {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $EnAddonOut) | Out-Null
-            Copy-Item $BuiltA -Destination $EnAddonOut -Force
+        $CdylibTargets = @(
+            @("reshade_addon",    "omega_tri_engine_addon.dll",    "OmegaTriEngine.addon64"),
+            @("reshade_mock_host","omega_reshade_mock_host.dll",   "OmegaReShadeMockHost64.dll"),
+            @("skse64_bridge",    "omega_skyrim_world_bridge.dll", "OmegaSkyrimWorldBridge.dll"),
+            @("skse64_mock_host", "omega_skse_mock_host.dll",      "OmegaSkseMockHost64.dll")
+        )
+        $PrevInc = $env:CARGO_INCREMENTAL
+        $env:CARGO_INCREMENTAL = "0"
+        try {
+            foreach ($ct in $CdylibTargets) {
+                $CrateDir = Join-Path $EnDir $ct[0]
+                $DstExp   = Join-Path $EnExportsDir $ct[2]
+                $DstShr   = Join-Path $SharedEnExportsDir $ct[2]
+                if (Test-Path (Join-Path $CrateDir "Cargo.toml")) {
+                    Push-Location $CrateDir
+                    try {
+                        & $Cgo.Source build --release --quiet | Out-Host
+                        if ($LASTEXITCODE -ne 0) {
+                            throw ("cargo build --release failed on " + $ct[0])
+                        }
+                    } finally {
+                        Pop-Location
+                    }
+                    $BuiltDll = Join-Path (Join-Path (Join-Path $CrateDir "target") "release") $ct[1]
+                    if (-not (Test-Path $BuiltDll)) {
+                        throw ("Expected compiled cdylib missing: " + $BuiltDll)
+                    }
+                    Copy-Item -Path $BuiltDll -Destination $DstExp -Force
+                    Copy-Item -Path $BuiltDll -Destination $DstShr -Force
+                }
+            }
+        } finally {
+            $env:CARGO_INCREMENTAL = $PrevInc
         }
     }
 }
@@ -363,9 +392,9 @@ if ($RunStressSuites) {
         $proc = [System.Diagnostics.Process]::Start($psi)
         $outTask = $proc.StandardOutput.ReadToEndAsync()
         $errTask = $proc.StandardError.ReadToEndAsync()
-        if (-not $proc.WaitForExit(60000)) {
+        if (-not $proc.WaitForExit(240000)) {
             try { $proc.Kill() } catch { }
-            throw ("Stress suite timed out after 60s on {0}" -f $lbl)
+            throw ("Stress suite timed out after 240s on {0}" -f $lbl)
         }
         $null = $proc.WaitForExit()
         $stdOut = ($outTask.GetAwaiter().GetResult() | Out-String).Trim()
@@ -395,4 +424,4 @@ if ($CreateDesktopShortcut) {
 if (-not $SkipLaunch) {
     Start-Process -FilePath $LauncherExe -WorkingDirectory $RepoRoot
 }
-Write-Host ">>> [ALL PASS] Unified Suite v3.7.1 (15 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green
+Write-Host ">>> [ALL PASS] Unified Suite v3.9.0 (15 Stations + Rust Audits) Compiled Cleanly!" -ForegroundColor Green

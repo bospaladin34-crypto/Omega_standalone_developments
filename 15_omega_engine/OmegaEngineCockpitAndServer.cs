@@ -70,6 +70,7 @@ namespace OmegaTriEngine
         public uint LiveMeshMask = 1u;
         public uint ReshadeAddonFrames = 0u;
         public uint ReshadeAddonApiVersion = 0u;
+        public OmegaTopBarController SharedTopBar;
         public Func<string, bool> OnReshadeProbeRequestedFromHttp;
         public Func<string, bool> OnSkseProbeRequestedFromHttp;
         public Func<string, bool, SkyrimModBundleResult> OnBuildSkyrimModRequestedFromHttp;
@@ -146,7 +147,7 @@ namespace OmegaTriEngine
                 sb.Append("{");
                 sb.Append("\"ok\":true,");
                 sb.Append("\"station\":15,");
-                sb.Append("\"service\":\"OmegaEngine v1.7.7\",");
+                sb.Append("\"service\":\"OmegaEngine v1.9.0\",");
                 sb.Append("\"suite_version\":\"3.7.0\",");
                 sb.Append("\"port\":19795,");
                 if (extraShockFlag) sb.Append("\"shockwave_triggered\":true,");
@@ -261,13 +262,81 @@ namespace OmegaTriEngine
 
                     if (path.Equals("/api/health", StringComparison.OrdinalIgnoreCase))
                     {
-                        WriteHttp(ns, "application/json; charset=utf-8", "{\"ok\":true,\"station\":15,\"service\":\"OmegaEngine v1.7.7\",\"suite_version\":\"3.7.0\",\"port\":19795}");
+                        WriteHttp(ns, "application/json; charset=utf-8", "{\"ok\":true,\"station\":15,\"service\":\"OmegaEngine v1.9.0\",\"suite_version\":\"3.7.0\",\"port\":19795}");
                         return;
                     }
                     if (path.Equals("/api/status", StringComparison.OrdinalIgnoreCase))
                     {
                         WriteHttp(ns, "application/json; charset=utf-8", _state.BuildStatusJson(false));
                         return;
+                    }
+                    if (path.Equals("/api/topbar", StringComparison.OrdinalIgnoreCase))
+                    {
+                        OmegaTopBarController tb = _state.SharedTopBar;
+                        bool ownTb = false;
+                        if (tb == null)
+                        {
+                            tb = new OmegaTopBarController(_state, new OmegaTriEngineUniformBus(OmegaTriEngineUniformBus.DefaultMapName));
+                            ownTb = true;
+                        }
+                        try
+                        {
+                            float qShow = ParseQueryFloat(query, "show", -1.0f);
+                            if (qShow >= 0.0f && !ownTb)
+                            {
+                                tb.ShowDesktopBar(qShow > 0.5f);
+                            }
+                            float qMaster = ParseQueryFloat(query, "master", -1.0f);
+                            if (qMaster >= 0.0f)
+                            {
+                                tb.ShaderMasterEnabled = (qMaster > 0.5f);
+                            }
+                            float qHud = ParseQueryFloat(query, "hud", -1.0f);
+                            if (qHud >= 0.0f)
+                            {
+                                tb.InShaderHudEnabled = (qHud > 0.5f);
+                            }
+                            float qFade = ParseQueryFloat(query, "menufade", -1.0f);
+                            if (qFade >= 0.0f)
+                            {
+                                tb.AutoMenuFadeEnabled = (qFade > 0.5f);
+                            }
+                            float qSym = ParseQueryFloat(query, "sym", -99.0f);
+                            if (qSym >= -0.5f && qSym <= 7.5f)
+                            {
+                                tb.SetSymmetryExplicit((int)Math.Round(qSym));
+                            }
+                            float qPer = ParseQueryFloat(query, "persona", -99.0f);
+                            if (qPer >= -0.25f && qPer <= 3.5f)
+                            {
+                                tb.SetPersonaExplicit((int)Math.Round(qPer));
+                            }
+                            float qBloom = ParseQueryFloat(query, "bloom", -1.0f);
+                            if (qBloom >= 0.05f && qBloom <= 3.0f)
+                            {
+                                tb.HdrBloomMultiplier = qBloom;
+                            }
+                            float qWaterZ = ParseQueryFloat(query, "waterz", -9999.0f);
+                            if (qWaterZ > -1000.0f && qWaterZ < 1000.0f)
+                            {
+                                tb.WaterElevationMeters = qWaterZ;
+                            }
+                            float qSpell = ParseQueryFloat(query, "spell", -99.0f);
+                            if (qSpell >= -0.25f && qSpell <= 5.5f)
+                            {
+                                int spId = (int)Math.Round(qSpell);
+                                tb.TriggerSpellPulseExplicit(spId, (spId > 0) ? 1.25f : 0.0f);
+                            }
+                            float qThuum = ParseQueryFloat(query, "thuum", -1.0f);
+                            bool fireTh = (qThuum > 0.5f);
+                            tb.PushControlsToBus(fireTh);
+                            WriteHttp(ns, "application/json; charset=utf-8", tb.BuildTopBarJson());
+                            return;
+                        }
+                        finally
+                        {
+                            if (ownTb) tb.Dispose();
+                        }
                     }
                     if (path.Equals("/api/shader_cache", StringComparison.OrdinalIgnoreCase))
                     {
@@ -771,7 +840,7 @@ namespace OmegaTriEngine
         {
             return "<!DOCTYPE html><html><head><meta charset='utf-8'/>" +
                    "<meta name='viewport' content='width=device-width,initial-scale=1'/>" +
-                   "<title>OmegaEngine v1.7.7 (:19795) Remote Pad</title>" +
+                   "<title>OmegaEngine v1.9.0 (:19795) Remote Pad</title>" +
                    "<style>body{margin:0;background:#070b14;color:#e2e8f0;font-family:Segoe UI,sans-serif;padding:16px;}" +
                    "h2{margin:0 0 10px 0;color:#38bdf8;font-size:16px;}" +
                    ".grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}" +
@@ -892,6 +961,8 @@ namespace OmegaTriEngine
         private Process _skseProbeProc = null;
         private Button _btnRsProbe = null;
         private Button _btnSkseProbe = null;
+        private Button _btnTopBarToggle = null;
+        private readonly OmegaTopBarController _topBarCtrl;
         private readonly bool _autoStartRsProbe = false;
         private readonly bool _autoStartSkseProbe = false;
         private uint _vsyncInterval = 0u;
@@ -928,6 +999,19 @@ namespace OmegaTriEngine
             _state.GpuAdapterName = (hwProf != null && !string.IsNullOrEmpty(hwProf.PrimaryGpuName)) ? hwProf.PrimaryGpuName : "DirectCompute cs_5_0";
             _mmfBus = new OmegaTriEngineUniformBus(OmegaTriEngineUniformBus.DefaultMapName);
             _audio = new OmegaTriEngineAudioAndBridge();
+            _topBarCtrl = new OmegaTopBarController(_state, _mmfBus);
+            _state.SharedTopBar = _topBarCtrl;
+            _topBarCtrl.OnStateMutated = delegate
+            {
+                if (!IsDisposed)
+                {
+                    try { BeginInvoke((Action)delegate { SyncControlsFromStateAndCompile(); }); } catch { }
+                }
+            };
+            _topBarCtrl.OnFireThuumRequested = delegate
+            {
+                _audio.TriggerShockwaveAcoustic(1.30f, 58.0f);
+            };
             _gpu = new OmegaEngineDirectComputeGpu();
             _http = new OmegaEngineHttpServer(_state);
 
@@ -1024,7 +1108,7 @@ namespace OmegaTriEngine
                 return mb;
             };
 
-            Text = "ACT-Omega Suite v3.7.1 :: Station 15 OmegaEngine v1.7.7 (:19795) [AI .omsh Co-Pilot (:19791) + Keyframe Turntable + QEF Dual-Contour + 2K PBR]";
+            Text = "ACT-Omega Suite v3.9.0 :: Station 15 OmegaEngine v1.9.0 (:19795) [AI .omsh Co-Pilot (:19791) + Keyframe Turntable + QEF Dual-Contour + 2K PBR]";
             Size = new Size(1560, 910);
             MinimumSize = new Size(1180, 720);
             StartPosition = FormStartPosition.CenterScreen;
@@ -1049,8 +1133,26 @@ namespace OmegaTriEngine
             _lblTopHud.TextAlign = ContentAlignment.MiddleLeft;
             _lblTopHud.Font = new Font("Consolas", 9.5f, FontStyle.Bold);
             _lblTopHud.ForeColor = C(56, 189, 248);
-            _lblTopHud.Text = "Station 15 OmegaEngine v1.7.7 (:19795) :: Loading SHA-256 DXBC Cache + FP16 HDR Pipeline...";
+            _lblTopHud.Text = "Station 15 OmegaEngine v1.9.0 (:19795) :: Loading SHA-256 DXBC Cache + FP16 HDR Pipeline...";
+            _btnTopBarToggle = new Button();
+            _btnTopBarToggle.Dock = DockStyle.Right;
+            _btnTopBarToggle.Width = 148;
+            _btnTopBarToggle.FlatStyle = FlatStyle.Flat;
+            _btnTopBarToggle.FlatAppearance.BorderSize = 1;
+            _btnTopBarToggle.FlatAppearance.BorderColor = C(245, 184, 81);
+            _btnTopBarToggle.BackColor = C(26, 34, 52);
+            _btnTopBarToggle.ForeColor = C(245, 184, 81);
+            _btnTopBarToggle.Font = new Font("Consolas", 8.5f, FontStyle.Bold);
+            _btnTopBarToggle.Text = "TOP HUD BAR [F10]";
+            _btnTopBarToggle.Click += delegate
+            {
+                _topBarCtrl.ToggleDesktopBar();
+                _btnTopBarToggle.BackColor = _topBarCtrl.IsDesktopBarVisible ? C(5, 150, 105) : C(26, 34, 52);
+                _btnTopBarToggle.ForeColor = _topBarCtrl.IsDesktopBarVisible ? Color.White : C(245, 184, 81);
+                _viewport.Focus();
+            };
             topBar.Controls.Add(_lblTopHud);
+            topBar.Controls.Add(_btnTopBarToggle);
 
             Panel botBar = new Panel();
             botBar.Dock = DockStyle.Bottom;
@@ -1435,6 +1537,7 @@ namespace OmegaTriEngine
             OmegaEngineDirectComputeGpu.TrimWorkingSetNow();
             _viewport.Focus();
             _loopActive = true;
+            _topBarCtrl.StartTimer60Hz();
             Application.Idle += OnApplicationIdle;
         }
 
@@ -1455,6 +1558,7 @@ namespace OmegaTriEngine
         {
             _loopActive = false;
             Application.Idle -= OnApplicationIdle;
+            try { _topBarCtrl.Dispose(); } catch { }
             StopRsProbeProcess();
             StopSkseProbeProcess();
             try { _http.Dispose(); } catch { }
@@ -2596,7 +2700,7 @@ namespace OmegaTriEngine
                         {
                             EngineStressSummary sum = OmegaEngineStressSuite.RunAll12Vectors();
                             Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-                                "[OMEGAENGINE v1.7.7 40-VECTOR TASK-3 AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.00} MB ({4:0.0} ms)",
+                                "[OMEGAENGINE v1.8.0 44-VECTOR PHASE-2 AUDIT] {0}/{1} PASS | {2} trials | RAM={3:0.00} MB ({4:0.0} ms)",
                                 sum.PassedCount, sum.TotalCount, sum.TotalTrials, sum.TrimmedWorkingSetMb, sum.TotalMs));
                             for (int k = 0; k < sum.Vectors.Count; k++)
                             {
@@ -2720,8 +2824,32 @@ namespace OmegaTriEngine
             try { SetProcessDPIAware(); } catch { }
             OmegaHardwareProfile prof = OmegaHardwareConfig.LoadAndApplyEnvironment(false);
             string engDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+            bool topBarOnlyMode = false;
+            if (args != null)
+            {
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (string.Equals(args[i], "--top-bar", StringComparison.OrdinalIgnoreCase))
+                    {
+                        topBarOnlyMode = true;
+                    }
+                }
+            }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            if (topBarOnlyMode)
+            {
+                OmegaEngineArenaState tbState = new OmegaEngineArenaState(Path.Combine(engDir, "exports"));
+                using (OmegaTriEngineUniformBus tbBus = new OmegaTriEngineUniformBus(OmegaTriEngineUniformBus.DefaultMapName))
+                using (OmegaTopBarController tbCtrl = new OmegaTopBarController(tbState, tbBus))
+                {
+                    tbCtrl.ShowDesktopBar(true);
+                    tbCtrl.StartTimer60Hz();
+                    tbCtrl.BarForm.FormClosed += delegate { Application.ExitThread(); };
+                    Application.Run();
+                }
+                return 0;
+            }
             Application.Run(new OmegaEngineCockpitForm(engDir, prof, startWithRsProbe, startWithSkseProbe));
             return 0;
         }

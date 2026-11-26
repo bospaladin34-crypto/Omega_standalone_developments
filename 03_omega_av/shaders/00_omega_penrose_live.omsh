@@ -1,0 +1,22 @@
+// Exported by OmegaPenrose v1.0.2 Final GM (07_omega_penrose)
+qx = x * 7.00; qy = y * 7.00;
+ws = 0.0; ridge = 0.0;
+ph0 = qx * 1.00000 + qy * 0.00000 + 0.2804 + t * 0.08 * bass;
+ws = ws + cos(6.283185 * ph0);
+ridge = ridge + exp(-abs(frac(ph0) - 0.5) * 24.0);
+ph1 = qx * 0.30902 + qy * 0.95106 + 0.1196 + t * 0.08 * bass;
+ws = ws + cos(6.283185 * ph1);
+ridge = ridge + exp(-abs(frac(ph1) - 0.5) * 24.0);
+ph2 = qx * -0.80902 + qy * 0.58779 + 0.1100 + t * 0.08 * bass;
+ws = ws + cos(6.283185 * ph2);
+ridge = ridge + exp(-abs(frac(ph2) - 0.5) * 24.0);
+ph3 = qx * -0.80902 + qy * -0.58779 + 0.2900 + t * 0.08 * bass;
+ws = ws + cos(6.283185 * ph3);
+ridge = ridge + exp(-abs(frac(ph3) - 0.5) * 24.0);
+ph4 = qx * 0.30902 + qy * -0.95106 + 0.2000 + t * 0.08 * bass;
+ws = ws + cos(6.283185 * ph4);
+ridge = ridge + exp(-abs(frac(ph4) - 0.5) * 24.0);
+qn = ws / 5.0 * 0.5 + 0.5;
+r = clamp(qn * 0.85 + ridge * 0.25 * mid, 0.0, 1.0);
+g = clamp(sin(qn * 3.14159) * 0.90 + bass * 0.30, 0.0, 1.0);
+b = clamp((1.0 - qn) * 0.95 + ridge * 0.35 * high, 0.0, 1.0);

@@ -62,3 +62,16 @@ workspace/shader_cache/
 *.pex
 workspace/ck_psc_headers/
 workspace/vortex_mod_stage/
+
+# SSH keys, credentials, certificates & local runtime shell/forge state (NEVER commit)
+10_omega_shell/config/
+09_omega_forge/*.tsv
+**/ssh/
+*id_ed25519*
+*id_rsa*
+*id_ecdsa*
+*.pem
+*.key
+*.pfx
+*.p12
+*.oshrc

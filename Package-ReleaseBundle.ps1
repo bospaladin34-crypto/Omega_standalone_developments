@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v3.7.1",
+    [string]$Version = "v3.9.0",
     [string]$BaselineCommit = "",
     [switch]$SkipRebuild
 )
@@ -109,6 +109,16 @@ if (Test-Path (Join-Path $RepoRoot "14_omega_braid_re\c11_cli\omega_braid_re_cli
 if (Test-Path (Join-Path $RepoRoot "15_omega_engine\c11_cli\omega_tri_engine_audit.c")) {
     New-Item -ItemType Directory -Force -Path (Join-Path $StageDir "15_omega_engine\c11_cli") | Out-Null
     Copy-Item -Path (Join-Path $RepoRoot "15_omega_engine\c11_cli\omega_tri_engine_audit.c") -Destination (Join-Path $StageDir "15_omega_engine\c11_cli\omega_tri_engine_audit.c") -Force
+}
+
+if (Test-Path (Join-Path $RepoRoot "15_omega_engine\exports")) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $StageDir "15_omega_engine\exports") | Out-Null
+    foreach ($expArt in @("OmegaTriEngine.addon64","OmegaSkyrimWorldBridge.dll","OmegaTriEngine_SkyrimAE.fx","ReShade.fxh","OmegaTriEngine_Preset.ini")) {
+        $srcArt = Join-Path $RepoRoot ("15_omega_engine\exports\" + $expArt)
+        if (Test-Path $srcArt) {
+            Copy-Item -Path $srcArt -Destination (Join-Path $StageDir ("15_omega_engine\exports\" + $expArt)) -Force
+        }
+    }
 }
 
 foreach ($emptyDir in @("downloads","corpus","bridge_export","workspace")) {

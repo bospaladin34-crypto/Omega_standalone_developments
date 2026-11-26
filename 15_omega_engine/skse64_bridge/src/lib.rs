@@ -214,11 +214,14 @@ const GENERIC_READ: u32 = 0x8000_0000;
 const FILE_SHARE_READ: u32 = 0x0000_0001;
 const FILE_SHARE_WRITE: u32 = 0x0000_0002;
 const OPEN_EXISTING: u32 = 3;
-const TOTAL_MAP_BYTES: usize = 384;
+const TOTAL_MAP_BYTES: usize = 512;
 const UNIFORM_BYTES: usize = 320;
 const TRAILER_OFFSET: usize = 320;
+const EXT_OFFSET: usize = 384;
 const MAGIC_OTRI: u32 = 0x4F54_5249;
-const CONTRACT_VERSION: u32 = 0x0001_0201;
+const CONTRACT_VERSION: u32 = 0x0001_0900;
+static G_TOPBAR_THUUM_STAMP_BITS: AtomicU32 = AtomicU32::new(0);
+static G_TOPBAR_THUUM_TICK64: AtomicU64 = AtomicU64::new(0);
 const MASK_OMEGA_ENGINE: u32 = 1 << 0;
 const MASK_OMEGA_SYNTH: u32 = 1 << 1;
 const MASK_OMEGA_PENROSE: u32 = 1 << 2;
@@ -745,7 +748,7 @@ pub unsafe extern "C" fn OmegaSksePushWorldState(
             if nh.is_null() {
                 return 0;
             }
-            let nv = MapViewOfFile(nh, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, TOTAL_MAP_BYTES);
+            let nv = MapViewOfFile(nh, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
             if nv.is_null() {
                 CloseHandle(nh);
                 return 0;
@@ -782,7 +785,7 @@ pub unsafe extern "C" fn OmegaSksePushWorldState(
             CloseHandle(m);
             return 0;
         }
-        let vw = MapViewOfFile(hm, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, TOTAL_MAP_BYTES);
+        let vw = MapViewOfFile(hm, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
         if vw.is_null() {
             CloseHandle(hm);
             CloseHandle(m);
@@ -833,6 +836,22 @@ pub unsafe extern "C" fn OmegaSksePushWorldState(
             z += 4;
         }
         ptr::write_volatile(view.add(TRAILER_OFFSET + 8) as *mut u64, 2);
+        let mut ez = 0usize;
+        while ez < 128 {
+            ptr::write_volatile(view.add(EXT_OFFSET + ez) as *mut u32, 0);
+            ez += 4;
+        }
+        ptr::write_volatile(view.add(EXT_OFFSET + 64) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 68) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 72) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 80) as *mut f32, 60.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 84) as *mut f32, 16.67);
+        ptr::write_volatile(view.add(EXT_OFFSET + 88) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 96) as *mut f32, -1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 100) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 104) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 112) as *mut f32, 180.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 124) as *mut f32, 1.0);
     }
 
     // 1. Convert Skyrim Z-up world eye (X_east, Y_north, Z_up) -> DirectX Y-up meters (X, Z, Y) * 0.01428
@@ -1004,7 +1023,6 @@ pub unsafe extern "C" fn OmegaSksePushWorldState(
     let odd_seq = base_seq.wrapping_add(1);
     let even_seq = base_seq.wrapping_add(2);
 
-    let crc = crc32_ieee_ptr(u80.as_ptr() as *const u8, UNIFORM_BYTES);
     (*seq_atom).store(odd_seq, Ordering::Release);
 
     let dst_f = view as *mut f32;
@@ -1013,10 +1031,46 @@ pub unsafe extern "C" fn OmegaSksePushWorldState(
         ptr::write_volatile(dst_f.add(j), u80[j]);
         j += 1;
     }
+    let tb_sent = ptr::read_volatile(view.add(EXT_OFFSET + 112) as *const f32);
+    if tb_sent > 179.5 && tb_sent < 180.5 {
+        let pulse_val = ptr::read_volatile(view.add(EXT_OFFSET + 108) as *const f32);
+        let pulse_bits = pulse_val.to_bits();
+        let prev_bits = G_TOPBAR_THUUM_STAMP_BITS.load(Ordering::Relaxed);
+        if pulse_val > 0.5 && pulse_bits != prev_bits {
+            G_TOPBAR_THUUM_STAMP_BITS.store(pulse_bits, Ordering::Relaxed);
+            G_TOPBAR_THUUM_TICK64.store(tick64, Ordering::Relaxed);
+        }
+        let trig_t0 = G_TOPBAR_THUUM_TICK64.load(Ordering::Relaxed);
+        if trig_t0 > 0 && tick64 >= trig_t0 {
+            let tb_age = ((tick64 - trig_t0) as f32) * 0.001;
+            if tb_age < 6.0 && tb_age >= 0.0 && live_str < 0.05 {
+                let tb_str = 1.40 * omega_exp_neg_f32(tb_age * 0.58);
+                let tb_rad = 0.45 + tb_age * 14.5;
+                ptr::write_volatile(dst_f.add(52), cx + fx * 1.8);
+                ptr::write_volatile(dst_f.add(53), cy);
+                ptr::write_volatile(dst_f.add(54), cz + fz * 1.8);
+                ptr::write_volatile(dst_f.add(55), tb_age);
+                ptr::write_volatile(dst_f.add(56), tb_str);
+                ptr::write_volatile(dst_f.add(57), tb_rad);
+                ptr::write_volatile(dst_f.add(58), 11.2);
+            }
+        }
+    } else {
+        ptr::write_volatile(view.add(EXT_OFFSET + 64) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 68) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 72) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 88) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 96) as *mut f32, -1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 100) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 104) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 112) as *mut f32, 180.0);
+    }
+    ptr::write_volatile(view.add(EXT_OFFSET + 124) as *mut f32, 1.0);
+    let recalc_crc = crc32_ieee_ptr(dst_f as *const u8, UNIFORM_BYTES);
     ptr::write_volatile(view.add(TRAILER_OFFSET + 0) as *mut u32, MAGIC_OTRI);
     ptr::write_volatile(view.add(TRAILER_OFFSET + 4) as *mut u32, CONTRACT_VERSION);
     ptr::write_volatile(view.add(TRAILER_OFFSET + 16) as *mut u32, live_mask);
-    ptr::write_volatile(view.add(TRAILER_OFFSET + 20) as *mut u32, crc);
+    ptr::write_volatile(view.add(TRAILER_OFFSET + 20) as *mut u32, recalc_crc);
     (*seq_atom).store(even_seq, Ordering::Release);
 
     ReleaseMutex(h_mtx);
@@ -1456,6 +1510,151 @@ pub unsafe extern "C" fn OmegaSkseStopWorker() {
     }
     G_WORKER_RUNNING.store(false, Ordering::Release);
     release_persist_bus_handles();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn OmegaSksePushWaterAndSpellState(
+    water_z_skyrim_units: f32,
+    spell_school_id: u32,
+    spell_strength: f32,
+    map_name_utf16: *const u16,
+) -> u32 {
+    let use_persist = map_name_utf16.is_null();
+    let target_name = if use_persist {
+        DEFAULT_MMF_UTF16.as_ptr()
+    } else {
+        map_name_utf16
+    };
+
+    let (h_mtx, h_map, view) = if use_persist {
+        let mut pm = G_PERSIST_MTX.load(Ordering::Acquire);
+        if pm.is_null() {
+            let mut mutex_name = [0u16; 96];
+            build_mutex_name_utf16(target_name, mutex_name.as_mut_ptr(), 96);
+            let nm = CreateMutexW(ptr::null_mut(), 0, mutex_name.as_ptr());
+            if nm.is_null() {
+                return 0;
+            }
+            if G_PERSIST_MTX
+                .compare_exchange(ptr::null_mut(), nm, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                pm = nm;
+            } else {
+                CloseHandle(nm);
+                pm = G_PERSIST_MTX.load(Ordering::Acquire);
+            }
+        }
+        let mut pv = G_PERSIST_VIEW.load(Ordering::Acquire);
+        if pv.is_null() {
+            let nh = CreateFileMappingW(
+                (-1isize) as *mut c_void,
+                ptr::null_mut(),
+                PAGE_READWRITE,
+                0,
+                TOTAL_MAP_BYTES as u32,
+                target_name,
+            );
+            if nh.is_null() {
+                return 0;
+            }
+            let nv = MapViewOfFile(nh, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+            if nv.is_null() {
+                CloseHandle(nh);
+                return 0;
+            }
+            if G_PERSIST_VIEW
+                .compare_exchange(ptr::null_mut(), nv, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                G_PERSIST_MAP.store(nh, Ordering::Release);
+                pv = nv;
+            } else {
+                UnmapViewOfFile(nv as *const c_void);
+                CloseHandle(nh);
+                pv = G_PERSIST_VIEW.load(Ordering::Acquire);
+            }
+        }
+        (pm, G_PERSIST_MAP.load(Ordering::Acquire), pv)
+    } else {
+        let mut mutex_name = [0u16; 96];
+        build_mutex_name_utf16(target_name, mutex_name.as_mut_ptr(), 96);
+        let m = CreateMutexW(ptr::null_mut(), 0, mutex_name.as_ptr());
+        if m.is_null() {
+            return 0;
+        }
+        let hm = CreateFileMappingW(
+            (-1isize) as *mut c_void,
+            ptr::null_mut(),
+            PAGE_READWRITE,
+            0,
+            TOTAL_MAP_BYTES as u32,
+            target_name,
+        );
+        if hm.is_null() {
+            CloseHandle(m);
+            return 0;
+        }
+        let vw = MapViewOfFile(hm, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+        if vw.is_null() {
+            CloseHandle(hm);
+            CloseHandle(m);
+            return 0;
+        }
+        (m, hm, vw)
+    };
+
+    if h_mtx.is_null() || view.is_null() {
+        return 0;
+    }
+
+    let wait_rc = WaitForSingleObject(h_mtx, 12);
+    if wait_rc != 0 && wait_rc != 0x0000_0080 {
+        if !use_persist {
+            UnmapViewOfFile(view as *const c_void);
+            CloseHandle(h_map);
+            CloseHandle(h_mtx);
+        }
+        return 0;
+    }
+
+    let water_m = water_z_skyrim_units * SKYRIM_UNIT_TO_METERS;
+    let sp_clamped = if spell_school_id > 5 { 5 } else { spell_school_id };
+    let str_clamped = if spell_strength < 0.0 {
+        0.0
+    } else if spell_strength > 2.5 {
+        2.5
+    } else {
+        spell_strength
+    };
+
+    let sent = ptr::read_volatile(view.add(EXT_OFFSET + 112) as *const f32);
+    if !(sent > 179.5 && sent < 180.5) {
+        ptr::write_volatile(view.add(EXT_OFFSET + 4) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 8) as *mut f32, 0.18);
+        ptr::write_volatile(view.add(EXT_OFFSET + 12) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 64) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 68) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 72) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 88) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 96) as *mut f32, -1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 100) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 104) as *mut f32, 1.0);
+        ptr::write_volatile(view.add(EXT_OFFSET + 112) as *mut f32, 180.0);
+    }
+    ptr::write_volatile(view.add(EXT_OFFSET + 16) as *mut f32, water_m);
+    ptr::write_volatile(view.add(EXT_OFFSET + 20) as *mut f32, 1.15);
+    ptr::write_volatile(view.add(EXT_OFFSET + 24) as *mut f32, sp_clamped as f32);
+    ptr::write_volatile(view.add(EXT_OFFSET + 28) as *mut f32, str_clamped);
+    ptr::write_volatile(view.add(TRAILER_OFFSET + 4) as *mut u32, CONTRACT_VERSION);
+
+    ReleaseMutex(h_mtx);
+    if !use_persist {
+        UnmapViewOfFile(view as *const c_void);
+        CloseHandle(h_map);
+        CloseHandle(h_mtx);
+    }
+    1
 }
 
 #[no_mangle]

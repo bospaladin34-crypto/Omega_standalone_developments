@@ -4,14 +4,17 @@ using OmegaCommon;
 
 namespace OmegaTriEngine
 {
-    // Station 15: OmegaEngine v1.7.0 (Suite v3.7.0, HTTP :19795)
-    // Phase 2 Multi-Station 384-Byte Shared-Memory Mesh Adapter over OmegaCommon.OmegaTriEngineSharedBus.
+    // Station 15: OmegaEngine v1.9.0 (Suite v3.9.0, HTTP :19795)
+    // Phase 1 Multi-Station 512-Byte OTRI v1.8 Shared-Memory Mesh Adapter (U0..U27 + TopBar Controls + 250ms Menu Auto-Fade).
     public sealed class OmegaTriEngineUniformBus : IDisposable
     {
         public const string DefaultMapName = OmegaTriEngineSharedBus.DefaultMapName;
         public const int FloatCount = OmegaTriEngineSharedBus.FloatCount;
         public const int UniformBytes = OmegaTriEngineSharedBus.UniformBytes;
         public const int TrailerOffset = OmegaTriEngineSharedBus.TrailerOffset;
+        public const int ExtOffset = OmegaTriEngineSharedBus.ExtOffset;
+        public const int ExtFloatCount = OmegaTriEngineSharedBus.ExtFloatCount;
+        public const int FullFloatCount = OmegaTriEngineSharedBus.FullFloatCount;
         public const int TotalMapBytes = OmegaTriEngineSharedBus.TotalMapBytes;
 
         public const uint MagicOtri = OmegaTriEngineSharedBus.MagicOtri;
@@ -65,6 +68,49 @@ namespace OmegaTriEngine
             return _inner.PublishEngineFrameAndMerge(u80, explicitExtraMask, out committedSeq, out crc32, out liveMask, out addonFrames);
         }
 
+        public bool WriteTopBarControls(
+            bool inShaderHud,
+            bool shaderMasterOn,
+            bool autoMenuFade,
+            bool clickThrough,
+            int symOverride,
+            float auroraMult,
+            float causticMult,
+            bool fireThuumPulse)
+        {
+            return _inner.WriteTopBarControls(inShaderHud, shaderMasterOn, autoMenuFade, clickThrough, symOverride, auroraMult, causticMult, fireThuumPulse);
+        }
+
+        public bool WritePhase2PersonaAndWorldCoupling(
+            int persona0To3,
+            float contrastScale,
+            float vignetteStrength,
+            float hdrBloomMult,
+            float waterElevMeters,
+            float waterRippleGain,
+            int spellSchool0To5,
+            float spellIntensity)
+        {
+            return _inner.WritePhase2PersonaAndWorldCoupling(
+                persona0To3, contrastScale, vignetteStrength, hdrBloomMult,
+                waterElevMeters, waterRippleGain, spellSchool0To5, spellIntensity);
+        }
+
+        public bool UpdateMenuFadeTelemetry(float menuFadeAlpha, bool menuDetected)
+        {
+            return _inner.UpdateMenuFadeTelemetry(menuFadeAlpha, menuDetected);
+        }
+
+        public bool ReadTopBarDiagnostics(out OmegaTriEngineSharedBus.TopBarLiveSnapshot snap)
+        {
+            return _inner.ReadTopBarDiagnostics(out snap);
+        }
+
+        public bool WriteExtendedSlot4(int slot20To27, float x, float y, float z, float w)
+        {
+            return _inner.WriteExtendedSlot4(slot20To27, x, y, z, w);
+        }
+
         public static bool TryReadSnapshot(string mapName, float[] dst80, out ulong seqOut, out uint activeMaskOut, out uint crcOut)
         {
             uint addonFrames, addonApi;
@@ -74,6 +120,11 @@ namespace OmegaTriEngine
         public static bool TryReadSnapshotWithAddon(string mapName, float[] dst80, out ulong seqOut, out uint activeMaskOut, out uint crcOut, out uint addonFramesOut, out uint addonApiOut)
         {
             return OmegaTriEngineSharedBus.TryReadSnapshotEx(mapName, dst80, out seqOut, out activeMaskOut, out crcOut, out addonFramesOut, out addonApiOut);
+        }
+
+        public static bool TryReadSnapshot112(string mapName, float[] dst112, out ulong seqOut, out uint activeMaskOut, out uint crcOut, out uint addonFramesOut, out uint addonApiOut)
+        {
+            return OmegaTriEngineSharedBus.TryReadSnapshot112(mapName, dst112, out seqOut, out activeMaskOut, out crcOut, out addonFramesOut, out addonApiOut);
         }
 
         public static string FormatSlotSummary(float[] u80)
